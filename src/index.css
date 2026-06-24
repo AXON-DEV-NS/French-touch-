@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Cairo", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand-blue: #0A1C3A;
+  --color-brand-red: #C8102E;
+  --color-brand-cream: #FDFBF7;
+  --color-brand-charcoal: #1F2226;
+  --color-brand-gold: #D4AF37;
+}
+
+/* Global scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FDFBF7;
+}
+::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #0A1C3A;
+}
+
+body {
+  background-color: var(--color-brand-cream);
+  color: var(--color-brand-charcoal);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+.serif-heading {
+  font-family: var(--font-serif);
+}
+
+.ar-dir {
+  direction: rtl;
+}
+
+.ltr-dir {
+  direction: ltr;
+}
+

@@ -1,0 +1,6 @@
+{
+  "name": "French Touch",
+  "description": "An elegant, luxurious multi-lingual restaurant platform combining French sophistication, Italian culinary warmth, and Cairo location details with high-fidelity admin controls and a dynamic weekly recurring offers engine.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,16 @@
+{
+  "managers": [
+    "uvyffi5@gmail.com"
+  ],
+  "visitors": [
+    {
+      "email": "demo_guest@frenchtouch.com",
+      "name": "Alexandre Dumas",
+      "timestamp": "2026-06-23T11:00:00Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      "authType": "sandbox",
+      "role": "Customer"
+    }
+  ]
+}
