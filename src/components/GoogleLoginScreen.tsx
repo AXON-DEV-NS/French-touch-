@@ -61,7 +61,12 @@ export default function GoogleLoginScreen({ currentLang, onLoginSuccess }: Googl
         if (res.ok) {
           const contentType = res.headers.get("content-type");
           if (contentType && contentType.includes("application/json")) {
-            dbUser = await res.json();
+            const text = await res.text();
+            try {
+              dbUser = JSON.parse(text);
+            } catch (jsonErr) {
+              console.warn("Failed to parse firebase-login JSON:", jsonErr);
+            }
           }
         }
       } catch (apiErr) {
@@ -114,8 +119,8 @@ export default function GoogleLoginScreen({ currentLang, onLoginSuccess }: Googl
         if (!urlRes.ok) {
           throw new Error(
             currentLang === "ar"
-              ? "الخدمة المساعدة غير متوفرة على بيئة الاستضافة هذه. يرجى تفعيل الدخول المباشر."
-              : "Server-assisted Auth URL is unavailable. Please ensure environment is set up correctly."
+              ? "الخدمة المساعدة غير متوفرة على بيئة الاستضافة هذه. يرجى استخدام الدخول التجريبي المباشر أدناه."
+              : "Server-assisted Auth URL is unavailable. Please use the Quick Demo Entry below."
           );
         }
 
@@ -123,12 +128,24 @@ export default function GoogleLoginScreen({ currentLang, onLoginSuccess }: Googl
         if (!contentType || !contentType.includes("application/json")) {
           throw new Error(
             currentLang === "ar"
-              ? "الخادم لم يرجع استجابة صالحة. يرجى استخدام تسجيل الدخول من جوجل المباشر."
-              : "Server did not return a valid response. Please try standard Google Login."
+              ? "الخادم لم يرجع استجابة صالحة. يرجى استخدام الدخول التجريبي المباشر أدناه."
+              : "Server did not return a valid response. Please use the Quick Demo Entry below."
           );
         }
 
-        const { url, missingConfig: isMissing } = await urlRes.json();
+        const text = await urlRes.text();
+        let urlData: any = null;
+        try {
+          urlData = JSON.parse(text);
+        } catch (jsonErr) {
+          throw new Error(
+            currentLang === "ar"
+              ? "فشل في قراءة بيانات الدخول من الخادم بشكل صحيح."
+              : "Failed to parse Auth URL data from server."
+          );
+        }
+
+        const { url, missingConfig: isMissing } = urlData || {};
 
         if (isMissing || !url) {
           setMissingConfig(true);
@@ -330,6 +347,57 @@ export default function GoogleLoginScreen({ currentLang, onLoginSuccess }: Googl
             )}
             <span>{currentLang === "ar" ? "سجل الدخول بحساب جوجل" : "Sign In with Google"}</span>
           </button>
+
+          {/* Elegant Divider */}
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-stone-800"></div>
+            <span className="flex-shrink mx-4 text-[10px] text-amber-500/50 uppercase tracking-widest font-mono">
+              {currentLang === "ar" ? "أو الدخول التجريبي السريع" : "Or Quick Demo Bypass"}
+            </span>
+            <div className="flex-grow border-t border-stone-800"></div>
+          </div>
+
+          <div className="space-y-2">
+            <button
+              onClick={() => onLoginSuccess({
+                email: "demo-customer@frenchtouch.com",
+                name: currentLang === 'ar' ? "عميل تجريبي" : "Demo Customer",
+                picture: "https://api.dicebear.com/7.x/bottts/svg?seed=customer",
+                role: "Customer"
+              })}
+              className="w-full py-3 px-4 bg-stone-800 hover:bg-stone-700/80 text-stone-200 hover:text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all border border-stone-700/50 cursor-pointer"
+            >
+              <span>🍽️</span>
+              <span>{currentLang === "ar" ? "دخول سريع كـ زبون تجريبي" : "Enter as Demo Customer"}</span>
+            </button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onLoginSuccess({
+                  email: "uvyffi5@gmail.com",
+                  name: currentLang === 'ar' ? "مدير الفرع" : "Branch Manager",
+                  picture: "https://api.dicebear.com/7.x/bottts/svg?seed=manager",
+                  role: "Manager"
+                })}
+                className="py-2.5 px-3 bg-stone-900 hover:bg-amber-500/10 text-amber-400 hover:text-amber-300 font-bold rounded-xl text-[11px] flex items-center justify-center gap-1.5 transition-all border border-amber-500/20 cursor-pointer"
+              >
+                <span>💼</span>
+                <span>{currentLang === "ar" ? "مدير تجريبي" : "Demo Manager"}</span>
+              </button>
+              <button
+                onClick={() => onLoginSuccess({
+                  email: "oren.on.oren.25@gmail.com",
+                  name: currentLang === 'ar' ? "مطور النظام" : "System Developer",
+                  picture: "https://api.dicebear.com/7.x/bottts/svg?seed=dev",
+                  role: "Developer"
+                })}
+                className="py-2.5 px-3 bg-stone-900 hover:bg-blue-500/10 text-blue-400 hover:text-blue-300 font-bold rounded-xl text-[11px] flex items-center justify-center gap-1.5 transition-all border border-blue-500/20 cursor-pointer"
+              >
+                <span>🛠️</span>
+                <span>{currentLang === "ar" ? "مطور تجريبي" : "Demo Developer"}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

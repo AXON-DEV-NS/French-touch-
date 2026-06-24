@@ -606,6 +606,22 @@ export default function App() {
             </button>
           </div>
 
+          {/* Mobile Language Selector (Visible on Mobile Only) */}
+          <div className="flex md:hidden items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200/50">
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => setCurrentLang(lang.code)}
+                className={`w-6.5 h-6.5 flex items-center justify-center text-sm rounded-lg transition-all cursor-pointer ${
+                  currentLang === lang.code ? 'bg-brand-blue text-brand-gold scale-105 shadow-sm' : 'opacity-65 hover:opacity-100'
+                }`}
+                title={lang.name}
+              >
+                {lang.flag}
+              </button>
+            ))}
+          </div>
+
           {/* Header Right: Cart Indicator & Login */}
           <div className="flex items-center gap-2.5">
             {/* Cart Icon Web App Shortcut with Badge */}
