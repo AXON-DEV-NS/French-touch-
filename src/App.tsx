@@ -111,7 +111,14 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_MANAGERS;
   });
 
-  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>(() => {
+    return [
+      { id: "appetizers", name: { ar: "مقبلات شهية", en: "Gourmet Appetizers", fr: "Entrées", it: "Antipasti" }, icon: "Soup" },
+      { id: "mains", name: { ar: "أطباق رئيسية فاخرة", en: "Signature Mains", fr: "Plats", it: "Piatti" }, icon: "Utensils" },
+      { id: "desserts", name: { ar: "حلويات فرنسية وإيطالية", en: "French & Italian Pastries", fr: "Desserts", it: "Dolci" }, icon: "Cake" },
+      { id: "drinks", name: { ar: "مشروبات منعشة", en: "Refreshing Drinks", fr: "Boissons", it: "Bevande" }, icon: "GlassWater" }
+    ];
+  });
 
   // --- Current Signed in User State ---
   const [currentUser, setCurrentUser] = useState<{ email: string; name: string; picture?: string; role: 'Developer' | 'Manager' | 'Customer' } | null>(() => {
@@ -178,16 +185,34 @@ export default function App() {
   // Increment page views once on mount
   useEffect(() => {
     fetch('/api/pageviews/increment', { method: 'POST' })
-      .then(res => res.json())
-      .catch(err => console.error('Failed to increment page views:', err));
+      .then(res => {
+        if (!res.ok) throw new Error('Not ok');
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return res.json();
+        }
+        throw new Error('Not JSON');
+      })
+      .catch(err => console.warn('Failed to increment page views:', err));
   }, []);
 
   // Fetch dynamic categories
   useEffect(() => {
     fetch('/api/categories')
-      .then(res => res.json())
-      .then(data => setCategories(data))
-      .catch(err => console.error('Failed to fetch categories:', err));
+      .then(res => {
+        if (!res.ok) throw new Error('Not ok');
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return res.json();
+        }
+        throw new Error('Not JSON');
+      })
+      .then(data => {
+        if (Array.isArray(data)) {
+          setCategories(data);
+        }
+      })
+      .catch(err => console.warn('Failed to fetch categories, using robust default categories instead:', err));
   }, []);
 
   useEffect(() => {

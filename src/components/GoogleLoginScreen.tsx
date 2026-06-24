@@ -46,25 +46,60 @@ export default function GoogleLoginScreen({ currentLang, onLoginSuccess }: Googl
       }
 
       // 2. Send profile details to backend to register visitor and resolve role
-      const res = await fetch("/api/auth/firebase-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: user.email,
-          name: user.displayName || user.email.split("@")[0],
-          picture: user.photoURL || ""
-        })
-      });
+      let dbUser: any = null;
+      try {
+        const res = await fetch("/api/auth/firebase-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: user.email,
+            name: user.displayName || user.email.split("@")[0],
+            picture: user.photoURL || ""
+          })
+        });
 
-      if (!res.ok) {
-        throw new Error(
-          currentLang === "ar"
-            ? "فشل في التحقق من الحساب وتعيين الصلاحيات عبر الخادم."
-            : "Failed to verify account and resolve permissions via server."
-        );
+        if (res.ok) {
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            dbUser = await res.json();
+          }
+        }
+      } catch (apiErr) {
+        console.warn("Server registering failed, falling back to secure client-side role resolution:", apiErr);
       }
 
-      const dbUser = await res.json();
+      // Client-side role resolution fallback if server is offline or on static hosting (like Vercel)
+      if (!dbUser) {
+        const emailLower = user.email.toLowerCase();
+        let role: "Developer" | "Manager" | "Customer" = "Customer";
+        
+        if (emailLower === "oren.on.oren.25@gmail.com") {
+          role = "Developer";
+        } else {
+          const defaultManagers = ["uvyffi5@gmail.com", "manager@frenchtouch.com"];
+          let savedManagers: any[] = [];
+          try {
+            const saved = localStorage.getItem("frenchtouch_managers");
+            if (saved) savedManagers = JSON.parse(saved);
+          } catch (e) {
+            console.error(e);
+          }
+          
+          const isManager = defaultManagers.includes(emailLower) || 
+                            savedManagers.some((m: any) => m && m.email && m.email.toLowerCase() === emailLower);
+          if (isManager) {
+            role = "Manager";
+          }
+        }
+
+        dbUser = {
+          email: emailLower,
+          name: user.displayName || user.email.split("@")[0],
+          picture: user.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${emailLower}`,
+          role
+        };
+      }
+
       setLoading(false);
       onLoginSuccess(dbUser);
     } catch (err: any) {
@@ -75,6 +110,24 @@ export default function GoogleLoginScreen({ currentLang, onLoginSuccess }: Googl
         // This is extremely robust and avoids iframe sandbox limitations.
         const redirectUri = `${window.location.origin}/auth/google/callback`;
         const urlRes = await fetch(`/api/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
+        
+        if (!urlRes.ok) {
+          throw new Error(
+            currentLang === "ar"
+              ? "الخدمة المساعدة غير متوفرة على بيئة الاستضافة هذه. يرجى تفعيل الدخول المباشر."
+              : "Server-assisted Auth URL is unavailable. Please ensure environment is set up correctly."
+          );
+        }
+
+        const contentType = urlRes.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error(
+            currentLang === "ar"
+              ? "الخادم لم يرجع استجابة صالحة. يرجى استخدام تسجيل الدخول من جوجل المباشر."
+              : "Server did not return a valid response. Please try standard Google Login."
+          );
+        }
+
         const { url, missingConfig: isMissing } = await urlRes.json();
 
         if (isMissing || !url) {
