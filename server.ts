@@ -23,11 +23,19 @@ interface Visitor {
   role: "Developer" | "Manager" | "Customer";
 }
 
+interface ManagerObj {
+  email: string;
+  name: string;
+  addedAt: string;
+  password?: string;
+}
+
 interface DbSchema {
-  managers: string[];
+  managers: ManagerObj[];
   visitors: Visitor[];
   pageViews?: number;
   categories?: { id: string; name: { ar: string; en: string; fr: string; it: string }; icon?: string }[];
+  subscribers?: string[];
 }
 
 const DEFAULT_CATEGORIES = [
@@ -42,10 +50,11 @@ function readDb(): DbSchema {
   try {
     if (!fs.existsSync(DB_FILE)) {
       const initialDb: DbSchema = {
-        managers: ["uvyffi5@gmail.com"],
+        managers: [], // Developer will add managers dynamically
         visitors: [],
         pageViews: 0,
-        categories: DEFAULT_CATEGORIES
+        categories: DEFAULT_CATEGORIES,
+        subscribers: []
       };
       fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2));
       return initialDb;
@@ -53,6 +62,7 @@ function readDb(): DbSchema {
     const content = fs.readFileSync(DB_FILE, "utf-8");
     const parsed = JSON.parse(content);
     let changed = false;
+
     if (parsed.pageViews === undefined) {
       parsed.pageViews = 0;
       changed = true;
@@ -61,13 +71,39 @@ function readDb(): DbSchema {
       parsed.categories = DEFAULT_CATEGORIES;
       changed = true;
     }
+    if (!parsed.subscribers) {
+      parsed.subscribers = [];
+      changed = true;
+    }
+    if (parsed.managers) {
+      parsed.managers = parsed.managers.map((m: any) => {
+        if (typeof m === "string") {
+          return {
+            email: m.toLowerCase(),
+            name: m.split("@")[0],
+            addedAt: new Date().toISOString(),
+            password: "123" // default fallback password
+          };
+        }
+        return m;
+      });
+      // Clear legacy hardcoded admins if requested
+      if (parsed.managers.some((m: any) => m.email === "uvyffi5@gmail.com" || m.email === "manager@frenchtouch.com")) {
+        parsed.managers = parsed.managers.filter((m: any) => m.email !== "uvyffi5@gmail.com" && m.email !== "manager@frenchtouch.com");
+        changed = true;
+      }
+    } else {
+      parsed.managers = [];
+      changed = true;
+    }
+
     if (changed) {
       fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), "utf-8");
     }
     return parsed;
   } catch (error) {
     console.error("Error reading database:", error);
-    return { managers: ["uvyffi5@gmail.com"], visitors: [], pageViews: 0, categories: DEFAULT_CATEGORIES };
+    return { managers: [], visitors: [], pageViews: 0, categories: DEFAULT_CATEGORIES, subscribers: [] };
   }
 }
 
@@ -161,7 +197,7 @@ app.get(["/auth/google/callback", "/auth/google/callback/"], async (req, res) =>
       role = "Developer";
     } else {
       const db = readDb();
-      const isManager = db.managers.some(m => m.toLowerCase() === email);
+      const isManager = db.managers.some(m => m.email.toLowerCase() === email);
       if (isManager) {
         role = "Manager";
       }
@@ -236,7 +272,7 @@ app.post("/api/auth/sandbox", (req, res) => {
     role = "Developer";
   } else {
     const db = readDb();
-    const isManager = db.managers.some(m => m.toLowerCase() === cleanEmail);
+    const isManager = db.managers.some(m => m.email.toLowerCase() === cleanEmail);
     if (isManager) {
       role = "Manager";
     }
@@ -282,7 +318,7 @@ app.post("/api/auth/firebase-login", (req, res) => {
     role = "Developer";
   } else {
     const db = readDb();
-    const isManager = db.managers.some(m => m.toLowerCase() === cleanEmail);
+    const isManager = db.managers.some(m => m.email.toLowerCase() === cleanEmail);
     if (isManager) {
       role = "Manager";
     }
@@ -318,19 +354,28 @@ app.get("/api/managers", (req, res) => {
 });
 
 app.post("/api/managers", (req, res) => {
-  const { email } = req.body;
+  const { email, name, password } = req.body;
   if (!email) {
     return res.status(400).json({ error: "Email is required" });
   }
 
   const cleanEmail = email.trim().toLowerCase();
+  const cleanName = name?.trim() || cleanEmail.split("@")[0];
+  const cleanPassword = password?.trim() || "123";
   const db = readDb();
 
-  if (db.managers.some(m => m.toLowerCase() === cleanEmail)) {
+  if (db.managers.some(m => m.email.toLowerCase() === cleanEmail)) {
     return res.status(400).json({ error: "Email is already authorized as a manager" });
   }
 
-  db.managers.push(cleanEmail);
+  const newManager = {
+    email: cleanEmail,
+    name: cleanName,
+    password: cleanPassword,
+    addedAt: new Date().toISOString()
+  };
+
+  db.managers.push(newManager);
   writeDb(db);
   res.json({ success: true, managers: db.managers });
 });
@@ -339,9 +384,88 @@ app.delete("/api/managers/:email", (req, res) => {
   const emailToRemove = req.params.email.trim().toLowerCase();
   const db = readDb();
 
-  db.managers = db.managers.filter(m => m.toLowerCase() !== emailToRemove);
+  db.managers = db.managers.filter(m => m.email.toLowerCase() !== emailToRemove);
   writeDb(db);
   res.json({ success: true, managers: db.managers });
+});
+
+// 4.5 Manager Password Login Gate
+app.post("/api/auth/manager-login", (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanPassword = password.trim();
+  const db = readDb();
+
+  const manager = db.managers.find(m => m.email.toLowerCase() === cleanEmail);
+  if (!manager) {
+    return res.status(401).json({ error: "هذا البريد الإلكتروني غير مسجل كمدير في النظام." });
+  }
+
+  if (manager.password !== cleanPassword) {
+    return res.status(401).json({ error: "كلمة المرور غير صحيحة، يرجى مراجعة المطور." });
+  }
+
+  // Log as visitor
+  const newVisitor: Visitor = {
+    email: cleanEmail,
+    name: manager.name,
+    picture: `https://api.dicebear.com/7.x/initials/svg?seed=${cleanEmail}`,
+    timestamp: new Date().toISOString(),
+    ip: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1",
+    userAgent: req.headers["user-agent"] || "French Touch Secure Gate",
+    authType: "sandbox",
+    role: "Manager"
+  };
+  db.visitors.unshift(newVisitor);
+  writeDb(db);
+
+  res.json({
+    success: true,
+    user: {
+      email: cleanEmail,
+      name: manager.name,
+      role: "Manager",
+      picture: newVisitor.picture
+    }
+  });
+});
+
+// 4.6 Newsletter & Gmail Subscribers API
+app.post("/api/subscribe", (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+  const cleanEmail = email.trim().toLowerCase();
+  const db = readDb();
+  if (!db.subscribers) db.subscribers = [];
+  if (!db.subscribers.includes(cleanEmail)) {
+    db.subscribers.push(cleanEmail);
+    writeDb(db);
+  }
+  res.json({ success: true, subscribers: db.subscribers });
+});
+
+app.get("/api/subscribers", (req, res) => {
+  const db = readDb();
+  res.json(db.subscribers || []);
+});
+
+app.post("/api/send-newsletter", (req, res) => {
+  const { subject, body } = req.body;
+  const db = readDb();
+  const subs = db.subscribers || [];
+  
+  console.log(`[SIMULATION] Dispatching newsletter to ${subs.length} emails:`);
+  subs.forEach(email => {
+    console.log(`[EMAIL DISPATCH] To: ${email} | Subject: ${subject}`);
+  });
+  
+  res.json({ success: true, count: subs.length, subscribers: subs });
 });
 
 // 5. Visitors logs (accessible to Developer only)

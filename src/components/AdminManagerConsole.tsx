@@ -1258,7 +1258,7 @@ export default function AdminManagerConsole({
                     </div>
 
                     {/* Cannot remove Super Admin from list to avoid lock-outs */}
-                    {m.email === 'uvyffi5@gmail.com' ? (
+                    {m.email === 'oren.on.oren.25@gmail.com' ? (
                       <span className="px-2 py-0.5 bg-gray-100 text-gray-400 text-[8px] tracking-wider rounded font-mono uppercase font-bold">
                         SYSTEM
                       </span>

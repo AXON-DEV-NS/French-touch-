@@ -1,17 +1,6 @@
 import { Product, ExclusiveOffer, WeeklyOffer, Manager, CustomizeOption } from './types';
 
-export const INITIAL_MANAGERS: Manager[] = [
-  {
-    email: 'uvyffi5@gmail.com',
-    name: 'Super Admin',
-    addedAt: new Date('2026-06-20').toISOString()
-  },
-  {
-    email: 'manager@frenchtouch.com',
-    name: 'Jean-Luc Marc',
-    addedAt: new Date('2026-06-21').toISOString()
-  }
-];
+export const INITIAL_MANAGERS: Manager[] = [];
 
 export const INITIAL_PRODUCTS: Product[] = [
   {

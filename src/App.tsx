@@ -21,6 +21,7 @@ import MenuSection from './components/MenuSection';
 import ExclusiveOfferBanner from './components/ExclusiveOfferBanner';
 import AdminManagerConsole from './components/AdminManagerConsole';
 import LoginModal from './components/LoginModal';
+import SubscriptionModal from './components/SubscriptionModal';
 import RestaurantLogo from './components/RestaurantLogo';
 import LanguageLandingScreen from './components/LanguageLandingScreen';
 import GoogleLoginScreen from './components/GoogleLoginScreen';
@@ -162,6 +163,27 @@ export default function App() {
   const [adminActiveTab, setAdminActiveTab] = useState<'products' | 'offers' | 'super'>('products');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
+  // --- Secret Portal Logic ---
+  const [logoClicks, setLogoClicks] = useState(0);
+  const [lastLogoClick, setLastLogoClick] = useState(0);
+
+  const handleLogoClick = () => {
+    const now = Date.now();
+    if (now - lastLogoClick < 3000) {
+      const newClicks = logoClicks + 1;
+      setLogoClicks(newClicks);
+      if (newClicks >= 5) {
+        setIsLoginModalOpen(true);
+        setLogoClicks(0);
+        console.log('Secret Login Modal Unlocked!');
+      }
+    } else {
+      setLogoClicks(1);
+    }
+    setLastLogoClick(now);
+    setActiveAppTab('dashboard');
+  };
+
   // --- Booking Form State ---
   const [bookingBranch, setBookingBranch] = useState<'medical' | 'waha'>('medical');
   const [bookingGuests, setBookingGuests] = useState(2);
@@ -260,8 +282,8 @@ export default function App() {
   const isDeveloper = currentUser?.role === 'Developer';
   const activeRole = (isDeveloper ? previewRole : currentUser?.role) || 'Customer';
 
-  const isManager = activeRole === 'Manager' || activeRole === 'Developer' || currentUser?.email === 'uvyffi5@gmail.com';
-  const isSuperAdmin = activeRole === 'Developer' || currentUser?.email === 'uvyffi5@gmail.com';
+  const isManager = activeRole === 'Manager' || activeRole === 'Developer' || currentUser?.email === 'oren.on.oren.25@gmail.com';
+  const isSuperAdmin = activeRole === 'Developer' || currentUser?.email === 'oren.on.oren.25@gmail.com';
 
   const handleLoginSuccess = (user: { email: string; name: string; picture?: string; role: 'Developer' | 'Manager' | 'Customer' }) => {
     setCurrentUser(user);
@@ -298,7 +320,7 @@ export default function App() {
   };
 
   const handleRemoveManager = (email: string) => {
-    if (email === 'uvyffi5@gmail.com') return;
+    if (email === 'oren.on.oren.25@gmail.com') return;
     setManagers(managers.filter(m => m.email !== email));
   };
 
@@ -500,15 +522,7 @@ export default function App() {
     );
   }
 
-  // Google Login Page blocks access after choosing language
-  if (!currentUser) {
-    return (
-      <GoogleLoginScreen
-        currentLang={currentLang}
-        onLoginSuccess={handleLoginSuccess}
-      />
-    );
-  }
+
 
   // Developer Command Center view
   if (currentUser?.role === 'Developer' && previewRole === 'Developer') {
@@ -560,7 +574,7 @@ export default function App() {
           {/* Header Left: Logo & Home triggers */}
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => setActiveAppTab('dashboard')} 
+              onClick={handleLogoClick} 
               className="hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer"
             >
               <RestaurantLogo className="scale-90" />
@@ -690,15 +704,7 @@ export default function App() {
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>
-            ) : (
-              <button
-                onClick={() => setIsLoginModalOpen(true)}
-                className="px-3.5 py-2 bg-brand-blue hover:bg-brand-blue/95 text-brand-cream text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-              >
-                <User className="w-3.5 h-3.5 text-brand-gold" />
-                <span>{t.login}</span>
-              </button>
-            )}
+            ) : null}
           </div>
         </div>
       </header>
@@ -1641,15 +1647,17 @@ export default function App() {
         currentLang={currentLang}
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
-        managers={managers}
-        onLoginSuccess={(email, name) => {
+        onLoginSuccess={(email, name, role) => {
           handleLoginSuccess({ 
             email, 
             name, 
-            role: email.toLowerCase() === 'oren.on.oren.25@gmail.com' ? 'Developer' : 'Manager' 
+            role
           });
         }}
       />
+
+      {/* PERSUASIVE NEWSLETTER SUBSCRIPTION MODAL */}
+      <SubscriptionModal currentLang={currentLang} />
 
       {/* PRODUCT CUSTOMIZER MODAL */}
       <ProductCustomizerModal

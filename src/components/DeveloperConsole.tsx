@@ -3,9 +3,9 @@ import { motion } from "motion/react";
 import { 
   Users, UserCheck, Trash2, PlusCircle, LayoutDashboard, 
   Sparkles, Globe, LogOut, Check, HelpCircle, Key, 
-  Database, RefreshCw, Eye, Landmark, ArrowLeftRight
+  Database, RefreshCw, Eye, Landmark, ArrowLeftRight, Mail, Send
 } from "lucide-react";
-import { Language, TRANSLATIONS } from "../types";
+import { Language, TRANSLATIONS, Manager } from "../types";
 
 interface VisitorLog {
   email: string;
@@ -38,12 +38,21 @@ export default function DeveloperConsole({
   const isRtl = currentLang === "ar";
 
   const [visitors, setVisitors] = useState<VisitorLog[]>([]);
-  const [managers, setManagers] = useState<string[]>([]);
+  const [managers, setManagers] = useState<Manager[]>([]);
+  const [subscribers, setSubscribers] = useState<string[]>([]);
+  
   const [newManagerEmail, setNewManagerEmail] = useState("");
+  const [newManagerName, setNewManagerName] = useState("");
+  const [newManagerPassword, setNewManagerPassword] = useState("");
+
+  const [newsletterSubject, setNewsletterSubject] = useState("");
+  const [newsletterBody, setNewsletterBody] = useState("");
+  const [newsletterSending, setNewsletterSending] = useState(false);
+
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [loadingManagers, setLoadingManagers] = useState(false);
   const [pageViews, setPageViews] = useState(0);
-  const [activeConsoleTab, setActiveConsoleTab] = useState<"logs" | "gmails">("logs");
+  const [activeConsoleTab, setActiveConsoleTab] = useState<"logs" | "gmails" | "subscribers">("logs");
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // Fetch visitors and managers from full-stack server
@@ -62,6 +71,10 @@ export default function DeveloperConsole({
       const pageViewsRes = await fetch("/api/pageviews");
       const pageViewsData = await pageViewsRes.json();
       setPageViews(pageViewsData.count || 0);
+
+      const subscribersRes = await fetch("/api/subscribers");
+      const subscribersData = await subscribersRes.json();
+      setSubscribers(subscribersData);
     } catch (err) {
       console.error("Error fetching developer data:", err);
     } finally {
@@ -74,19 +87,21 @@ export default function DeveloperConsole({
     fetchData();
   }, []);
 
-  // Add a manager email
+  // Add a manager email with name and custom password
   const handleAddManager = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newManagerEmail) return;
 
     const email = newManagerEmail.trim().toLowerCase();
+    const name = newManagerName.trim() || email.split("@")[0];
+    const password = newManagerPassword.trim() || "123";
     setMessage(null);
 
     try {
       const res = await fetch("/api/managers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, name, password })
       });
 
       const data = await res.json();
@@ -96,8 +111,10 @@ export default function DeveloperConsole({
 
       setManagers(data.managers);
       setNewManagerEmail("");
+      setNewManagerName("");
+      setNewManagerPassword("");
       setMessage({
-        text: currentLang === "ar" ? "تمت إضافة بريد المدير بنجاح!" : "Manager email added successfully!",
+        text: currentLang === "ar" ? "تمت إضافة وتفويض المدير بكلمة مرور مخصصة بنجاح!" : "Manager added with custom password successfully!",
         type: "success"
       });
       // Refresh visitors in case roles updated
@@ -128,6 +145,34 @@ export default function DeveloperConsole({
       setVisitors(await visitorsRes.json());
     } catch (err: any) {
       setMessage({ text: err.message, type: "error" });
+    }
+  };
+
+  // Dispatch Newsletter
+  const handleSendNewsletter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterSubject || !newsletterBody) return;
+    setNewsletterSending(true);
+    try {
+      const res = await fetch("/api/send-newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: newsletterSubject, body: newsletterBody })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(
+          currentLang === "ar"
+            ? `تمت محاكاة إرسال البريد الإلكتروني بنجاح لـ ${data.count} عملاء مسجلين!`
+            : `Newsletter simulated and dispatched successfully to ${data.count} registered clients!`
+        );
+        setNewsletterSubject("");
+        setNewsletterBody("");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setNewsletterSending(false);
     }
   };
 
@@ -340,8 +385,8 @@ export default function DeveloperConsole({
 
               <p className="text-xs text-stone-400 leading-relaxed">
                 {currentLang === "ar"
-                  ? "اكتب البريد الإلكتروني لأي مستخدم (مثل عمال المطعم أو الملاك). عند تسجيل دخولهم من جوجل، سيتم تحويلهم فوراً لصفحة الإدارة والمدير."
-                  : "Add the email address of any user. When they sign in with Google, they will be recognized as a Manager and directed to the Admin Console."}
+                  ? "قم بإضافة حساب مدير مخصص مع اسم مرور وسري. سيقوم المدراء بتسجيل الدخول باستخدام بريدهم ورقمهم السري المحدد هنا بشكل مباشر وبشكل سري تماماً."
+                  : "Add custom manager accounts with designated names and passwords. Managers will sign in using their email and this password via our secure hidden gate."}
               </p>
 
               {message && (
@@ -355,23 +400,42 @@ export default function DeveloperConsole({
                 </div>
               )}
 
-              {/* Form */}
-              <form onSubmit={handleAddManager} className="flex gap-2">
-                <input
-                  type="email"
-                  required
-                  value={newManagerEmail}
-                  onChange={(e) => setNewManagerEmail(e.target.value)}
-                  placeholder={currentLang === "ar" ? "manager@gmail.com" : "manager@example.com"}
-                  className="flex-grow bg-stone-950 border border-stone-800 focus:border-blue-500/50 rounded-xl px-3.5 py-2.5 text-xs text-[#fbf8f5] outline-none placeholder-stone-600 font-mono"
-                />
-                <button
-                  type="submit"
-                  className="px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>{currentLang === "ar" ? "إضافة" : "Add"}</span>
-                </button>
+              {/* Form with Password */}
+              <form onSubmit={handleAddManager} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="email"
+                    required
+                    value={newManagerEmail}
+                    onChange={(e) => setNewManagerEmail(e.target.value)}
+                    placeholder={currentLang === "ar" ? "بريد المدير الالكتروني" : "Manager email"}
+                    className="bg-stone-950 border border-stone-800 focus:border-blue-500/50 rounded-xl px-3.5 py-2.5 text-xs text-[#fbf8f5] outline-none placeholder-stone-600 font-mono"
+                  />
+                  <input
+                    type="text"
+                    value={newManagerName}
+                    onChange={(e) => setNewManagerName(e.target.value)}
+                    placeholder={currentLang === "ar" ? "الاسم (اختياري)" : "Name (optional)"}
+                    className="bg-stone-950 border border-stone-800 focus:border-blue-500/50 rounded-xl px-3.5 py-2.5 text-xs text-[#fbf8f5] outline-none placeholder-stone-600"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={newManagerPassword}
+                    onChange={(e) => setNewManagerPassword(e.target.value)}
+                    placeholder={currentLang === "ar" ? "كلمة المرور للمدير" : "Custom Password / PIN"}
+                    className="flex-grow bg-stone-950 border border-stone-800 focus:border-blue-500/50 rounded-xl px-3.5 py-2.5 text-xs text-[#fbf8f5] outline-none placeholder-stone-600 font-mono"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>{currentLang === "ar" ? "إضافة" : "Add"}</span>
+                  </button>
+                </div>
               </form>
 
               {/* Managers List */}
@@ -380,24 +444,32 @@ export default function DeveloperConsole({
                   <div className="text-stone-500 text-xs text-center py-4 font-mono">Loading active managers...</div>
                 ) : managers.length === 0 ? (
                   <div className="text-stone-600 text-xs text-center py-4 italic">
-                    {currentLang === "ar" ? "لا توجد حسابات مضافة كمدير حالياً." : "No manager emails added yet."}
+                    {currentLang === "ar" ? "لا توجد حسابات مضافة كمدير حالياً." : "No manager accounts added yet."}
                   </div>
                 ) : (
-                  managers.map((mEmail) => (
+                  managers.map((m) => (
                     <div 
-                      key={mEmail}
-                      className="flex justify-between items-center p-2.5 bg-stone-950 border border-stone-800/80 rounded-xl hover:border-stone-700 transition-all"
+                      key={m.email}
+                      className="flex flex-col p-3 bg-stone-950 border border-stone-800/80 rounded-xl hover:border-stone-700 transition-all gap-1.5"
                     >
-                      <span className="text-xs font-mono font-medium text-stone-300 select-all">
-                        {mEmail}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveManager(mEmail)}
-                        className="p-1.5 text-stone-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                        title={currentLang === "ar" ? "حذف المدير" : "Revoke Manager"}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex justify-between items-center w-full">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white font-sans">{m.name || m.email.split('@')[0]}</p>
+                          <p className="text-[10px] font-mono text-stone-400 select-all truncate">{m.email}</p>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveManager(m.email)}
+                          className="p-1.5 text-stone-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer shrink-0"
+                          title={currentLang === "ar" ? "حذف المدير" : "Revoke Manager"}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] bg-stone-900 px-2 py-1 rounded-md border border-stone-800/50">
+                        <Key className="w-3 h-3 text-amber-500 shrink-0" />
+                        <span className="text-stone-400 font-mono">Password:</span>
+                        <span className="text-amber-400 font-mono font-bold select-all bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">{m.password || "123"}</span>
+                      </div>
                     </div>
                   ))
                 )}
@@ -416,7 +488,7 @@ export default function DeveloperConsole({
                 </h3>
                 
                 {/* Visual Tab Buttons */}
-                <div className="flex gap-2.5 mt-3 border-b border-stone-800/20 pb-1">
+                <div className="flex gap-2.5 mt-3 border-b border-stone-800/20 pb-1 flex-wrap">
                   <button
                     onClick={() => setActiveConsoleTab("logs")}
                     className={`pb-1 text-xs font-bold border-b-2 transition-all cursor-pointer ${
@@ -436,6 +508,16 @@ export default function DeveloperConsole({
                     }`}
                   >
                     {currentLang === "ar" ? "جميع الحسابات المسجلة 📧" : "All Registered Accounts 📧"}
+                  </button>
+                  <button
+                    onClick={() => setActiveConsoleTab("subscribers")}
+                    className={`pb-1 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                      activeConsoleTab === "subscribers" 
+                        ? "border-blue-400 text-blue-400" 
+                        : "border-transparent text-stone-400 hover:text-stone-300"
+                    }`}
+                  >
+                    {currentLang === "ar" ? "مشتركو العروض 🔔" : "Offer Subscribers 🔔"}
                   </button>
                 </div>
               </div>
@@ -596,7 +678,7 @@ export default function DeveloperConsole({
                                   <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black tracking-wider uppercase border border-amber-500/30">
                                     Developer
                                   </span>
-                                ) : managers.some(m => m.toLowerCase() === p.email.toLowerCase()) ? (
+                                ) : managers.some(m => m.email.toLowerCase() === p.email.toLowerCase()) ? (
                                   <span className="px-2 py-0.5 rounded bg-[#002395]/40 text-blue-300 text-[9px] font-black tracking-wider uppercase border border-blue-500/30">
                                     Authorized Manager
                                   </span>
@@ -621,6 +703,75 @@ export default function DeveloperConsole({
                     </table>
                   );
                 })()}
+              </div>
+            )}
+
+            {/* TAB CONTENT: NEWSLETTER SUBSCRIBERS */}
+            {activeConsoleTab === "subscribers" && (
+              <div className="p-6 space-y-6">
+                <div className="bg-stone-950 p-4 rounded-2xl border border-stone-800 space-y-3">
+                  <h4 className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                    <Mail className="w-4 h-4" />
+                    <span>{currentLang === "ar" ? "إرسال إشعار / عرض جديد للعملاء على الجيميل" : "Simulate Gmail Campaign / Notification"}</span>
+                  </h4>
+                  <p className="text-[11px] text-stone-400">
+                    {currentLang === "ar"
+                      ? "اكتب تفاصيل العرض أو المنتج الجديد هنا، وسيتم إرسال إشعار فوري لجميع العملاء الذين وافقوا على استلام الرسائل عند فتحهم للموقع."
+                      : "Craft a new offer or product update. When sent, all users who subscribed on their Gmail will receive simulated dispatch alerts."}
+                  </p>
+                  <form onSubmit={handleSendNewsletter} className="space-y-3">
+                    <div>
+                      <input
+                        type="text"
+                        required
+                        value={newsletterSubject}
+                        onChange={(e) => setNewsletterSubject(e.target.value)}
+                        placeholder={currentLang === "ar" ? "عنوان العرض (مثال: خصم 25% على الباستا الفرنسية! 🍝)" : "Newsletter Subject (e.g., 25% Off Fresh Pasta! 🍝)"}
+                        className="w-full bg-stone-900 border border-stone-800 focus:border-blue-500/50 rounded-xl px-3 py-2 text-xs text-[#fbf8f5] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <textarea
+                        required
+                        rows={3}
+                        value={newsletterBody}
+                        onChange={(e) => setNewsletterBody(e.target.value)}
+                        placeholder={currentLang === "ar" ? "اكتب محتوى العرض بالتفصيل هنا..." : "Write your newsletter body here..."}
+                        className="w-full bg-stone-900 border border-stone-800 focus:border-blue-500/50 rounded-xl px-3 py-2 text-xs text-[#fbf8f5] outline-none resize-none"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={newsletterSending || subscribers.length === 0}
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all disabled:opacity-30 cursor-pointer"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>
+                        {newsletterSending 
+                          ? (currentLang === "ar" ? "جاري الإرسال والمحاكاة..." : "Sending Simulation...") 
+                          : (currentLang === "ar" ? `إرسال الإشعار لـ (${subscribers.length}) عملاء` : `Send simulated update to (${subscribers.length}) subscribers`)}
+                      </span>
+                    </button>
+                  </form>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-[#fbf8f5]">{currentLang === "ar" ? "قائمة المشتركين النشطين" : "Active Email Subscribers"}</h4>
+                  {subscribers.length === 0 ? (
+                    <p className="text-stone-500 text-xs italic">
+                      {currentLang === "ar" ? "لا يوجد مشتركون مسجلون حالياً." : "No clients have subscribed for offers yet."}
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {subscribers.map((subEmail) => (
+                        <div key={subEmail} className="flex items-center gap-2 bg-stone-950 p-2.5 rounded-xl border border-stone-800 font-mono text-[11px] text-stone-300">
+                          <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                          <span className="truncate flex-1 select-all" title={subEmail}>{subEmail}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

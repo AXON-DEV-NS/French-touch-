@@ -54,6 +54,7 @@ export interface Manager {
   email: string;
   name: string;
   addedAt: string;
+  password?: string;
 }
 
 export const LANGUAGES: { code: Language; name: string; flag: string; dir: 'rtl' | 'ltr' }[] = [

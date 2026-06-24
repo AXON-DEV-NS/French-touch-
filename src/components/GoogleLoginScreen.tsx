@@ -81,7 +81,7 @@ export default function GoogleLoginScreen({ currentLang, onLoginSuccess }: Googl
         if (emailLower === "oren.on.oren.25@gmail.com") {
           role = "Developer";
         } else {
-          const defaultManagers = ["uvyffi5@gmail.com", "manager@frenchtouch.com"];
+          const defaultManagers: string[] = [];
           let savedManagers: any[] = [];
           try {
             const saved = localStorage.getItem("frenchtouch_managers");
@@ -374,8 +374,8 @@ export default function GoogleLoginScreen({ currentLang, onLoginSuccess }: Googl
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => onLoginSuccess({
-                  email: "uvyffi5@gmail.com",
-                  name: currentLang === 'ar' ? "مدير الفرع" : "Branch Manager",
+                   email: "manager@frenchtouch.com",
+                   name: currentLang === 'ar' ? "مدير الفرع" : "Branch Manager",
                   picture: "https://api.dicebear.com/7.x/bottts/svg?seed=manager",
                   role: "Manager"
                 })}
