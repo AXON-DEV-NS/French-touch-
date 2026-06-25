@@ -94,7 +94,22 @@ export default function App() {
 
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = safeStorage.getItem('frenchtouch_products');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map((p: any) => {
+            if (p.category === 'appetizers' || p.category === 'mains') {
+              return { ...p, category: p.category === 'appetizers' ? 'fries' : 'sandwiches' };
+            }
+            return p;
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to parse cached products", e);
+      }
+    }
+    return INITIAL_PRODUCTS;
   });
 
   const [exclusiveOffer, setExclusiveOffer] = useState<ExclusiveOffer>(() => {
@@ -114,10 +129,10 @@ export default function App() {
 
   const [categories, setCategories] = useState<CategoryItem[]>(() => {
     return [
-      { id: "appetizers", name: { ar: "مقبلات شهية", en: "Gourmet Appetizers", fr: "Entrées", it: "Antipasti" }, icon: "Soup" },
-      { id: "mains", name: { ar: "أطباق رئيسية فاخرة", en: "Signature Mains", fr: "Plats", it: "Piatti" }, icon: "Utensils" },
-      { id: "desserts", name: { ar: "حلويات فرنسية وإيطالية", en: "French & Italian Pastries", fr: "Desserts", it: "Dolci" }, icon: "Cake" },
-      { id: "drinks", name: { ar: "مشروبات منعشة", en: "Refreshing Drinks", fr: "Boissons", it: "Bevande" }, icon: "GlassWater" }
+      { id: "sandwiches", name: { ar: "السندوتشات الفاخرة", en: "Gourmet Sandwiches", fr: "Sandwiches Fins", it: "Panini Gourmet" }, icon: "ChefHat" },
+      { id: "fries", name: { ar: "بطاطس فرنش تاتش", en: "French Touch Fries", fr: "Frites Croustillantes", it: "Patatine Croccanti" }, icon: "Sparkles" },
+      { id: "desserts", name: { ar: "الحلويات اللذيذة", en: "Delicious Desserts", fr: "Desserts Fins", it: "Dolci Deliziosi" }, icon: "Cake" },
+      { id: "drinks", name: { ar: "المشروبات المنعشة", en: "Refreshing Drinks", fr: "Boissons", it: "Bevande" }, icon: "GlassWater" }
     ];
   });
 
@@ -154,7 +169,7 @@ export default function App() {
   }, [previewRole]);
 
   // --- App-style Navigation State ---
-  const [activeAppTab, setActiveAppTab] = useState<'dashboard' | 'menu' | 'reserve' | 'offers' | 'locations' | 'admin'>('dashboard');
+  const [activeAppTab, setActiveAppTab] = useState<'dashboard' | 'menu' | 'reserve' | 'offers' | 'locations' | 'admin' | 'account'>('menu');
 
   // --- Interactive Simulated Order Bag/Cart State ---
   const [cart, setCart] = useState<{ id: string; product: Product; quantity: number; selectedAddons?: CustomizeOption[]; selectedSauces?: CustomizeOption[] }[]>([]);
@@ -189,7 +204,7 @@ export default function App() {
       setLogoClicks(1);
     }
     setLastLogoClick(now);
-    setActiveAppTab('dashboard');
+    setActiveAppTab('menu');
   };
 
   // --- Booking Form State ---
@@ -247,7 +262,14 @@ export default function App() {
 
   // Fetch authorized managers from server-side database
   useEffect(() => {
-    fetch('/api/managers')
+    if (currentUser?.role !== 'Developer') return;
+
+    fetch('/api/managers', {
+      headers: {
+        'x-user-email': currentUser.email,
+        'x-user-role': currentUser.role
+      }
+    })
       .then(res => {
         if (!res.ok) throw new Error('Not ok');
         const contentType = res.headers.get('content-type');
@@ -262,7 +284,7 @@ export default function App() {
         }
       })
       .catch(err => console.warn('Failed to fetch managers from server:', err));
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     safeStorage.setItem('frenchtouch_products', JSON.stringify(products));
@@ -324,7 +346,7 @@ export default function App() {
         safeStorage.setItem('frenchtouch_lang', user.lang);
       }
     } else {
-      setActiveAppTab('dashboard');
+      setActiveAppTab('menu');
       setIsAdminConsoleVisible(false);
     }
   };
@@ -333,7 +355,7 @@ export default function App() {
     setCurrentUser(null);
     setPreviewRole('Developer');
     setIsAdminConsoleVisible(false);
-    setActiveAppTab('dashboard');
+    setActiveAppTab('menu');
   };
 
   // --- Action Handlers ---
@@ -403,7 +425,11 @@ export default function App() {
     try {
       const res = await fetch('/api/categories', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-email': currentUser?.email || '',
+          'x-user-role': currentUser?.role || ''
+        },
         body: JSON.stringify({ id, name, icon })
       });
       const data = await res.json();
@@ -419,7 +445,11 @@ export default function App() {
   const handleDeleteCategory = async (id: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await fetch(`/api/categories/${encodeURIComponent(id)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'x-user-email': currentUser?.email || '',
+          'x-user-role': currentUser?.role || ''
+        }
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete category');
@@ -598,7 +628,7 @@ export default function App() {
               setActiveAppTab('admin');
               setIsAdminConsoleVisible(true);
             } else {
-              setActiveAppTab('dashboard');
+              setActiveAppTab('menu');
               setIsAdminConsoleVisible(false);
             }
           }
@@ -621,7 +651,7 @@ export default function App() {
   }, 0);
 
   return (
-    <div className={`min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between selection:bg-brand-gold selection:text-brand-blue ${currentLangDir === 'rtl' ? 'ar-dir' : 'ltr-dir'}`}>
+    <div className={`min-h-screen bg-brand-cream text-brand-charcoal flex flex-col justify-between selection:bg-brand-gold selection:text-brand-blue ${currentLangDir === 'rtl' ? 'ar-dir' : 'ltr-dir'}`}>
       
       {/* 1. TOP MARGIN FRENCH FLAG DECORATIVE RIBBON */}
       <div className="w-full h-1.5 flex flex-row shrink-0">
@@ -631,7 +661,7 @@ export default function App() {
       </div>
 
       {/* 2. DYNAMIC APP CONTAINER HEADER */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm shrink-0">
+      <header className="sticky top-0 z-40 bg-brand-cream/95 backdrop-blur-md border-b border-brand-gold/15 shadow-sm shrink-0">
         <div className="max-w-7xl mx-auto px-4 py-3.5 flex items-center justify-between gap-4">
           
           {/* Header Left: Logo & Home triggers */}
@@ -794,7 +824,7 @@ export default function App() {
       <div className="max-w-7xl mx-auto w-full flex flex-col lg:flex-row flex-grow px-4 py-6 md:py-8 gap-8 items-stretch overflow-hidden">
         
         {/* Desktop Left Sidebar (App Navigation) */}
-        <aside className="hidden lg:flex flex-col w-64 shrink-0 bg-white border border-slate-100 rounded-3xl p-6 shadow-sm justify-between gap-6 self-start">
+        <aside className="hidden lg:flex flex-col w-64 shrink-0 bg-brand-cream border border-brand-gold/15 rounded-3xl p-6 shadow-sm justify-between gap-6 self-start">
           <div className="space-y-6">
             <div className="px-2">
               <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase font-mono block mb-1">
@@ -807,17 +837,19 @@ export default function App() {
 
             {/* Navigation Menu */}
             <nav className="space-y-1.5">
-              <button
-                onClick={() => { setActiveAppTab('dashboard'); setIsAdminConsoleVisible(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold transition-all transform active:scale-98 cursor-pointer ${
-                  activeAppTab === 'dashboard'
-                    ? 'bg-brand-blue text-[#FDFBF7] shadow-md shadow-brand-blue/15'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <LayoutDashboard className="w-4.5 h-4.5 text-brand-gold" />
-                <span>{currentLang === 'ar' ? 'لوحة التحكم الرئيسية' : 'Dashboard Hub'}</span>
-              </button>
+              {(isManager || isDeveloper) && (
+                <button
+                  onClick={() => { setActiveAppTab('dashboard'); setIsAdminConsoleVisible(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold transition-all transform active:scale-98 cursor-pointer ${
+                    activeAppTab === 'dashboard'
+                      ? 'bg-brand-blue text-[#FDFBF7] shadow-md shadow-brand-blue/15'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <LayoutDashboard className="w-4.5 h-4.5 text-brand-gold" />
+                  <span>{currentLang === 'ar' ? 'لوحة التحكم الرئيسية' : 'Dashboard Hub'}</span>
+                </button>
+              )}
 
               <button
                 onClick={() => { setActiveAppTab('menu'); setIsAdminConsoleVisible(false); }}
@@ -871,6 +903,19 @@ export default function App() {
                 <span>{t.branches}</span>
               </button>
 
+              <button
+                onClick={() => { setActiveAppTab('account'); setIsAdminConsoleVisible(false); }}
+                id="tab-btn-account"
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold transition-all transform active:scale-98 cursor-pointer ${
+                  activeAppTab === 'account'
+                    ? 'bg-brand-blue text-[#FDFBF7] shadow-md shadow-brand-blue/15'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <User className="w-4.5 h-4.5 text-brand-gold" />
+                <span>{currentLang === 'ar' ? 'حسابي الشخصي' : 'My Account'}</span>
+              </button>
+
               {isManager && (
                 <button
                   onClick={() => { setActiveAppTab('admin'); setIsAdminConsoleVisible(true); }}
@@ -887,21 +932,29 @@ export default function App() {
             </nav>
           </div>
 
-          {/* Quick Stats Widget */}
-          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3.5">
-            <h4 className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 font-mono">
-              {currentLang === 'ar' ? 'بيانات التطبيق اللحظية' : 'App Real-time Telemetry'}
-            </h4>
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div className="bg-white p-2 rounded-xl border border-slate-200/40">
-                <p className="text-xs text-slate-400">{currentLang === 'ar' ? 'الأصناف' : 'Dishes'}</p>
-                <p className="font-mono font-black text-sm text-brand-blue">{products.length}</p>
+          {/* Quick Stats Widget or Brand Quote Card */}
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3">
+            {(isManager || isDeveloper) ? (
+              <>
+                <h4 className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 font-mono">
+                  {currentLang === 'ar' ? 'بيانات التطبيق اللحظية' : 'App Real-time Telemetry'}
+                </h4>
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div className="bg-white p-2 rounded-xl border border-slate-200/40">
+                    <p className="text-[10px] text-slate-400">{currentLang === 'ar' ? 'الأصناف' : 'Dishes'}</p>
+                    <p className="font-mono font-black text-xs text-brand-blue">{products.length}</p>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-200/40">
+                    <p className="text-[10px] text-slate-400">{currentLang === 'ar' ? 'الفروع' : 'Cities'}</p>
+                    <p className="font-mono font-black text-xs text-brand-blue">2</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-1">
+                <span className="text-lg">⚜️</span>
               </div>
-              <div className="bg-white p-2 rounded-xl border border-slate-200/40">
-                <p className="text-xs text-slate-400">{currentLang === 'ar' ? 'الفروع' : 'Cities'}</p>
-                <p className="font-mono font-black text-sm text-brand-blue">2</p>
-              </div>
-            </div>
+            )}
             
             {/* Ambient French Quote */}
             <p className="text-[10px] text-slate-500 italic leading-normal text-center pt-1 border-t border-slate-200/50">
@@ -913,7 +966,7 @@ export default function App() {
         </aside>
 
         {/* Dynamic App Center Workspace View Panel */}
-        <main className="flex-1 min-w-0 bg-white border border-slate-100 rounded-3xl shadow-sm p-4 md:p-8 flex flex-col justify-between overflow-y-auto">
+        <main className="flex-1 min-w-0 bg-brand-cream border border-brand-gold/15 rounded-3xl shadow-sm p-4 md:p-8 flex flex-col justify-between overflow-y-auto">
           
           {/* Active Tab Component Render Wrapper */}
           <div className="space-y-8 flex-grow">
@@ -1110,7 +1163,7 @@ export default function App() {
                           name: { ar: '', en: '', fr: '', it: '' }, 
                           description: { ar: '', en: '', fr: '', it: '' }, 
                           price: 150, 
-                          category: 'mains', 
+                          category: 'sandwiches', 
                           image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80' 
                         });
                       }}
@@ -1517,6 +1570,182 @@ export default function App() {
               </div>
             )}
 
+            {/* MY ACCOUNT VIEW */}
+            {activeAppTab === 'account' && (
+              <div className="space-y-8 animate-in fade-in duration-300">
+                <div>
+                  <h2 className="serif-heading text-2xl md:text-3xl font-extrabold text-brand-blue">
+                    {currentLang === 'ar' ? 'حسابي الشخصي' : 'My Account'}
+                  </h2>
+                  <p className="text-gray-500 text-xs mt-1">
+                    {currentLang === 'ar' ? 'إدارة تفاصيل حسابك، لغة التطبيق، والتحقق من فواتير طلباتك السابقة.' : 'Manage your profile details, application language, and view previous order receipts.'}
+                  </p>
+                </div>
+
+                <div className="max-w-xl mx-auto bg-white border border-slate-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+                  {currentUser ? (
+                    <div className="space-y-6">
+                      <div className="flex flex-col sm:flex-row items-center gap-4 border-b border-slate-100 pb-6">
+                        <img 
+                          src={currentUser.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${currentUser.email}`} 
+                          alt={currentUser.name} 
+                          className="w-16 h-16 rounded-full border-2 border-brand-gold shadow-md"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="text-center sm:text-start space-y-1">
+                          <h3 className="serif-heading text-xl font-bold text-brand-blue">{currentUser.name}</h3>
+                          <p className="text-xs text-slate-500 font-mono">{currentUser.email}</p>
+                          <span className="inline-block px-3 py-1 bg-brand-gold/10 text-brand-gold text-[9px] uppercase font-bold tracking-widest font-mono rounded-full mt-1.5">
+                            {currentUser.role === 'Developer' 
+                              ? (currentLang === 'ar' ? 'المطور المعتمد' : 'Primary Developer') 
+                              : currentUser.role === 'Manager' 
+                                ? (currentLang === 'ar' ? 'مدير المطعم' : 'Restaurant Manager') 
+                                : (currentLang === 'ar' ? 'عميل كلاسيك' : 'Gourmet Customer')}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                            {currentLang === 'ar' ? 'لغة التطبيق الافتراضية' : 'Default Application Language'}
+                          </label>
+                          <div className="flex gap-2">
+                            {(['ar', 'en', 'fr', 'it'] as Language[]).map((lang) => (
+                              <button
+                                key={lang}
+                                onClick={() => {
+                                  setCurrentLang(lang);
+                                  safeStorage.setItem('frenchtouch_lang', lang);
+                                }}
+                                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                                  currentLang === lang 
+                                    ? 'bg-brand-blue text-white border-brand-blue shadow-sm' 
+                                    : 'bg-slate-50 text-slate-600 border-slate-200/60 hover:bg-slate-100'
+                                }`}
+                              >
+                                {lang === 'ar' ? 'العربية 🇪🇬' : lang === 'en' ? 'English 🇺🇸' : lang === 'fr' ? 'Français 🇫🇷' : 'Italiano 🇮🇹'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {orderReceipt && (
+                          <div className="bg-brand-blue/5 border border-brand-blue/10 rounded-2xl p-4 mt-4 space-y-3">
+                            <h4 className="text-xs font-black text-brand-blue flex items-center gap-1.5">
+                              <span>🧾</span>
+                              <span>{currentLang === 'ar' ? 'طلبك الأخير المعتمد' : 'Your Latest Receipt'}</span>
+                            </h4>
+                            <div className="text-[11px] text-slate-600 space-y-1.5 font-mono">
+                              <div className="flex justify-between border-b border-slate-100 pb-1">
+                                <span>ID:</span>
+                                <span className="font-bold text-brand-blue">{orderReceipt.receiptId}</span>
+                              </div>
+                              <div className="flex justify-between border-b border-slate-100 pb-1">
+                                <span>Date:</span>
+                                <span>{new Date(orderReceipt.timestamp).toLocaleDateString()}</span>
+                              </div>
+                              <div className="flex justify-between text-amber-700 font-bold">
+                                <span>Total (VAT incl.):</span>
+                                <span>{orderReceipt.total} {t.currency}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={handleLogout}
+                        className="w-full py-3.5 bg-red-50 hover:bg-red-100 text-brand-red font-bold rounded-2xl text-xs transition-colors cursor-pointer border border-red-100"
+                      >
+                        {currentLang === 'ar' ? 'تسجيل الخروج من الحساب' : 'Logout from Account'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="text-center space-y-2">
+                        <h3 className="serif-heading text-xl font-extrabold text-brand-blue">
+                          {currentLang === 'ar' ? 'تسجيل الدخول إلى حسابك' : 'Access Your Account'}
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          {currentLang === 'ar' ? 'سجل الدخول لحفظ طلباتك وعروضك المفضلة وحجز طاولاتك بسهولة.' : 'Log in to manage your active table bookings and save culinary receipts.'}
+                        </p>
+                      </div>
+
+                      <div className="space-y-4">
+                        <button
+                          onClick={() => {
+                            handleLoginSuccess({
+                              email: 'guest_' + Math.random().toString(36).substr(2, 5) + '@frenchtouch.com',
+                              name: currentLang === 'ar' ? 'عميل زائر' : 'Gourmet Guest',
+                              role: 'Customer'
+                            });
+                          }}
+                          className="w-full py-3.5 bg-brand-blue hover:bg-brand-blue/95 text-white font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <span>👑</span>
+                          <span>{currentLang === 'ar' ? 'الدخول كعميل زائر سريع' : 'Continue as Guest'}</span>
+                        </button>
+
+                        <div className="relative flex py-2 items-center">
+                          <div className="flex-grow border-t border-slate-100"></div>
+                          <span className="flex-shrink mx-4 text-[10px] text-slate-400 font-mono font-bold uppercase">{currentLang === 'ar' ? 'أو للمدراء' : 'Or for Managers'}</span>
+                          <div className="flex-grow border-t border-slate-100"></div>
+                        </div>
+
+                        <form onSubmit={(e) => {
+                          e.preventDefault();
+                          const formData = new FormData(e.currentTarget);
+                          const email = formData.get('email') as string;
+                          const password = formData.get('password') as string;
+                          if (!email || !password) return;
+
+                          fetch('/api/auth/manager-login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email, password })
+                          })
+                          .then(res => res.json())
+                          .then(data => {
+                            if (data.success) {
+                              handleLoginSuccess(data.user);
+                            } else {
+                              alert(data.error || 'Login failed');
+                            }
+                          })
+                          .catch(err => {
+                            console.error(err);
+                            alert('Error connecting to server');
+                          });
+                        }} className="space-y-3">
+                          <input
+                            type="email"
+                            name="email"
+                            required
+                            placeholder={currentLang === 'ar' ? 'البريد الإلكتروني للمدير' : 'Manager Email'}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                          />
+                          <input
+                            type="password"
+                            name="password"
+                            required
+                            placeholder={currentLang === 'ar' ? 'كلمة المرور' : 'Password'}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                          />
+                          <button
+                            type="submit"
+                            className="w-full py-3 bg-brand-gold hover:bg-brand-gold/95 text-brand-blue font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                          >
+                            {currentLang === 'ar' ? 'تسجيل دخول كمدير' : 'Manager Login'}
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
           </div>
 
           {/* DYNAMIC BACKEND OVERVIEW FOOTNOTE */}
@@ -1672,15 +1901,17 @@ export default function App() {
 
       {/* 5. RESPONSIVE MOBILE APP BOTTOM NAVIGATION BAR */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] flex justify-around py-2 shrink-0">
-        <button
-          onClick={() => { setActiveAppTab('dashboard'); setIsAdminConsoleVisible(false); }}
-          className={`flex flex-col items-center gap-0.5 text-[9px] font-bold py-1 px-3 rounded-xl transition-all ${
-            activeAppTab === 'dashboard' ? 'text-brand-blue scale-105 font-black' : 'text-slate-400'
-          }`}
-        >
-          <LayoutDashboard className={`w-5 h-5 ${activeAppTab === 'dashboard' ? 'text-brand-gold' : ''}`} />
-          <span>{currentLang === 'ar' ? 'الرئيسية' : 'Home'}</span>
-        </button>
+        {(isManager || isDeveloper) && (
+          <button
+            onClick={() => { setActiveAppTab('dashboard'); setIsAdminConsoleVisible(false); }}
+            className={`flex flex-col items-center gap-0.5 text-[9px] font-bold py-1 px-3 rounded-xl transition-all ${
+              activeAppTab === 'dashboard' ? 'text-brand-blue scale-105 font-black' : 'text-slate-400'
+            }`}
+          >
+            <LayoutDashboard className={`w-5 h-5 ${activeAppTab === 'dashboard' ? 'text-brand-gold' : ''}`} />
+            <span>{currentLang === 'ar' ? 'الرئيسية' : 'Home'}</span>
+          </button>
+        )}
 
         <button
           onClick={() => { setActiveAppTab('menu'); setIsAdminConsoleVisible(false); }}
@@ -1720,6 +1951,16 @@ export default function App() {
         >
           <Map className={`w-5 h-5 ${activeAppTab === 'locations' ? 'text-brand-gold' : ''}`} />
           <span>{currentLang === 'ar' ? 'الفروع' : 'Branches'}</span>
+        </button>
+
+        <button
+          onClick={() => { setActiveAppTab('account'); setIsAdminConsoleVisible(false); }}
+          className={`flex flex-col items-center gap-0.5 text-[9px] font-bold py-1 px-3 rounded-xl transition-all ${
+            activeAppTab === 'account' ? 'text-brand-blue scale-105 font-black' : 'text-slate-400'
+          }`}
+        >
+          <User className={`w-5 h-5 ${activeAppTab === 'account' ? 'text-brand-gold' : ''}`} />
+          <span>{currentLang === 'ar' ? 'الحساب' : 'Account'}</span>
         </button>
       </div>
 

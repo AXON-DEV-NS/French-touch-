@@ -1,6 +1,11 @@
 {
   "managers": [
-    "uvyffi5@gmail.com"
+    {
+      "email": "uvyffi5@gmail.com",
+      "name": "uvyffi5",
+      "addedAt": "2026-06-25T18:57:37.007Z",
+      "password": "123"
+    }
   ],
   "visitors": [
     {
@@ -12,5 +17,49 @@
       "authType": "sandbox",
       "role": "Customer"
     }
-  ]
+  ],
+  "pageViews": 4,
+  "categories": [
+    {
+      "id": "sandwiches",
+      "name": {
+        "ar": "السندوتشات الفاخرة",
+        "en": "Gourmet Sandwiches",
+        "fr": "Sandwiches Fins",
+        "it": "Panini Gourmet"
+      },
+      "icon": "ChefHat"
+    },
+    {
+      "id": "fries",
+      "name": {
+        "ar": "بطاطس فرنش تاتش",
+        "en": "French Touch Fries",
+        "fr": "Frites Croustillantes",
+        "it": "Patatine Croccanti"
+      },
+      "icon": "Sparkles"
+    },
+    {
+      "id": "desserts",
+      "name": {
+        "ar": "الحلويات اللذيذة",
+        "en": "Delicious Desserts",
+        "fr": "Desserts Fins",
+        "it": "Dolci Deliziosi"
+      },
+      "icon": "Cake"
+    },
+    {
+      "id": "drinks",
+      "name": {
+        "ar": "المشروبات المنعشة",
+        "en": "Refreshing Drinks",
+        "fr": "Boissons",
+        "it": "Bevande"
+      },
+      "icon": "GlassWater"
+    }
+  ],
+  "subscribers": []
 }

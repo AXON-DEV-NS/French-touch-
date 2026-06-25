@@ -61,19 +61,27 @@ export default function DeveloperConsole({
     setLoadingLogs(true);
     setLoadingManagers(true);
     try {
-      const visitorsRes = await fetch("/api/visitors");
+      const headers = {
+        "x-user-email": currentUser.email,
+        "x-user-role": currentUser.role
+      };
+
+      const visitorsRes = await fetch("/api/visitors", { headers });
+      if (!visitorsRes.ok) throw new Error("Unauthorized");
       const visitorsData = await visitorsRes.json();
       setVisitors(visitorsData);
 
-      const managersRes = await fetch("/api/managers");
+      const managersRes = await fetch("/api/managers", { headers });
+      if (!managersRes.ok) throw new Error("Unauthorized");
       const managersData = await managersRes.json();
       setManagers(managersData);
 
-      const pageViewsRes = await fetch("/api/pageviews");
+      const pageViewsRes = await fetch("/api/pageviews", { headers });
       const pageViewsData = await pageViewsRes.json();
       setPageViews(pageViewsData.count || 0);
 
-      const subscribersRes = await fetch("/api/subscribers");
+      const subscribersRes = await fetch("/api/subscribers", { headers });
+      if (!subscribersRes.ok) throw new Error("Unauthorized");
       const subscribersData = await subscribersRes.json();
       setSubscribers(subscribersData);
     } catch (err) {
@@ -101,7 +109,11 @@ export default function DeveloperConsole({
     try {
       const res = await fetch("/api/managers", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-user-email": currentUser.email,
+          "x-user-role": currentUser.role
+        },
         body: JSON.stringify({ email, name, password, lang: newManagerLang })
       });
 
@@ -120,7 +132,12 @@ export default function DeveloperConsole({
         type: "success"
       });
       // Refresh visitors in case roles updated
-      const visitorsRes = await fetch("/api/visitors");
+      const visitorsRes = await fetch("/api/visitors", {
+        headers: {
+          "x-user-email": currentUser.email,
+          "x-user-role": currentUser.role
+        }
+      });
       setVisitors(await visitorsRes.json());
     } catch (err: any) {
       setMessage({ text: err.message, type: "error" });
@@ -132,7 +149,11 @@ export default function DeveloperConsole({
     setMessage(null);
     try {
       const res = await fetch(`/api/managers/${encodeURIComponent(email)}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: {
+          "x-user-email": currentUser.email,
+          "x-user-role": currentUser.role
+        }
       });
       const data = await res.json();
       if (!res.ok) throw new Error("Failed to remove manager");
@@ -143,7 +164,12 @@ export default function DeveloperConsole({
         type: "success"
       });
       // Refresh visitors
-      const visitorsRes = await fetch("/api/visitors");
+      const visitorsRes = await fetch("/api/visitors", {
+        headers: {
+          "x-user-email": currentUser.email,
+          "x-user-role": currentUser.role
+        }
+      });
       setVisitors(await visitorsRes.json());
     } catch (err: any) {
       setMessage({ text: err.message, type: "error" });
@@ -158,15 +184,19 @@ export default function DeveloperConsole({
     try {
       const res = await fetch("/api/send-newsletter", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-user-email": currentUser.email,
+          "x-user-role": currentUser.role
+        },
         body: JSON.stringify({ subject: newsletterSubject, body: newsletterBody })
       });
       const data = await res.json();
       if (res.ok) {
         alert(
           currentLang === "ar"
-            ? `تمت محاكاة إرسال البريد الإلكتروني بنجاح لـ ${data.count} عملاء مسجلين!`
-            : `Newsletter simulated and dispatched successfully to ${data.count} registered clients!`
+              ? `تمت محاكاة إرسال البريد الإلكتروني بنجاح لـ ${data.count} عملاء مسجلين!`
+              : `Newsletter simulated and dispatched successfully to ${data.count} registered clients!`
         );
         setNewsletterSubject("");
         setNewsletterBody("");
@@ -184,7 +214,13 @@ export default function DeveloperConsole({
       return;
     }
     try {
-      const res = await fetch("/api/visitors", { method: "DELETE" });
+      const res = await fetch("/api/visitors", { 
+        method: "DELETE",
+        headers: {
+          "x-user-email": currentUser.email,
+          "x-user-role": currentUser.role
+        }
+      });
       const data = await res.json();
       setVisitors(data.visitors);
     } catch (err) {

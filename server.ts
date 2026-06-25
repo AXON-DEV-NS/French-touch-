@@ -40,10 +40,10 @@ interface DbSchema {
 }
 
 const DEFAULT_CATEGORIES = [
-  { id: "appetizers", name: { ar: "مقبلات شهية", en: "Gourmet Appetizers", fr: "Entrées", it: "Antipasti" }, icon: "Soup" },
-  { id: "mains", name: { ar: "أطباق رئيسية فاخرة", en: "Signature Mains", fr: "Plats", it: "Piatti" }, icon: "Utensils" },
-  { id: "desserts", name: { ar: "حلويات فرنسية وإيطالية", en: "French & Italian Pastries", fr: "Desserts", it: "Dolci" }, icon: "Cake" },
-  { id: "drinks", name: { ar: "مشروبات منعشة", en: "Refreshing Drinks", fr: "Boissons", it: "Bevande" }, icon: "GlassWater" }
+  { id: "sandwiches", name: { ar: "السندوتشات الفاخرة", en: "Gourmet Sandwiches", fr: "Sandwiches Fins", it: "Panini Gourmet" }, icon: "ChefHat" },
+  { id: "fries", name: { ar: "بطاطس فرنش تاتش", en: "French Touch Fries", fr: "Frites Croustillantes", it: "Patatine Croccanti" }, icon: "Sparkles" },
+  { id: "desserts", name: { ar: "الحلويات اللذيذة", en: "Delicious Desserts", fr: "Desserts Fins", it: "Dolci Deliziosi" }, icon: "Cake" },
+  { id: "drinks", name: { ar: "المشروبات المنعشة", en: "Refreshing Drinks", fr: "Boissons", it: "Bevande" }, icon: "GlassWater" }
 ];
 
 // Read database helper
@@ -115,6 +115,29 @@ function writeDb(data: DbSchema) {
 // ----------------------------------------------------
 // API ROUTES
 // ----------------------------------------------------
+
+// Security Middlewares for Role Separation
+function requireDeveloper(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const email = (req.headers["x-user-email"] as string || "").trim().toLowerCase();
+  const role = (req.headers["x-user-role"] as string || "").trim();
+  
+  if (email === "oren.on.oren.25@gmail.com" || role === "Developer") {
+    return next();
+  }
+  
+  return res.status(403).json({ error: "Access denied. Only the primary Developer possesses full authorization to access or modify this resource." });
+}
+
+function requireManagerOrDeveloper(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const email = (req.headers["x-user-email"] as string || "").trim().toLowerCase();
+  const role = (req.headers["x-user-role"] as string || "").trim();
+  
+  if (email === "oren.on.oren.25@gmail.com" || role === "Developer" || role === "Manager") {
+    return next();
+  }
+  
+  return res.status(403).json({ error: "Access denied. You must be an authorized Manager or Developer to perform this action." });
+}
 
 // 1. Google OAuth URL Request
 app.get("/api/auth/google/url", (req, res) => {
@@ -353,12 +376,12 @@ app.post("/api/auth/firebase-login", (req, res) => {
 });
 
 // 4. Managers Endpoints
-app.get("/api/managers", (req, res) => {
+app.get("/api/managers", requireDeveloper, (req, res) => {
   const db = readDb();
   res.json(db.managers);
 });
 
-app.post("/api/managers", (req, res) => {
+app.post("/api/managers", requireDeveloper, (req, res) => {
   const { email, name, password, lang } = req.body;
   if (!email) {
     return res.status(400).json({ error: "Email is required" });
@@ -387,7 +410,7 @@ app.post("/api/managers", (req, res) => {
   res.json({ success: true, managers: db.managers });
 });
 
-app.delete("/api/managers/:email", (req, res) => {
+app.delete("/api/managers/:email", requireDeveloper, (req, res) => {
   const emailToRemove = req.params.email.trim().toLowerCase();
   const db = readDb();
 
@@ -458,12 +481,12 @@ app.post("/api/subscribe", (req, res) => {
   res.json({ success: true, subscribers: db.subscribers });
 });
 
-app.get("/api/subscribers", (req, res) => {
+app.get("/api/subscribers", requireDeveloper, (req, res) => {
   const db = readDb();
   res.json(db.subscribers || []);
 });
 
-app.post("/api/send-newsletter", (req, res) => {
+app.post("/api/send-newsletter", requireDeveloper, (req, res) => {
   const { subject, body } = req.body;
   const db = readDb();
   const subs = db.subscribers || [];
@@ -477,12 +500,12 @@ app.post("/api/send-newsletter", (req, res) => {
 });
 
 // 5. Visitors logs (accessible to Developer only)
-app.get("/api/visitors", (req, res) => {
+app.get("/api/visitors", requireDeveloper, (req, res) => {
   const db = readDb();
   res.json(db.visitors);
 });
 
-app.delete("/api/visitors", (req, res) => {
+app.delete("/api/visitors", requireDeveloper, (req, res) => {
   const db = readDb();
   db.visitors = [];
   writeDb(db);
@@ -508,7 +531,7 @@ app.get("/api/categories", (req, res) => {
   res.json(db.categories || DEFAULT_CATEGORIES);
 });
 
-app.post("/api/categories", (req, res) => {
+app.post("/api/categories", requireManagerOrDeveloper, (req, res) => {
   const { id, name, icon } = req.body;
   if (!id || !name || !name.ar || !name.en || !name.fr || !name.it) {
     return res.status(400).json({ error: "id and names in all 4 languages are required." });
@@ -529,7 +552,7 @@ app.post("/api/categories", (req, res) => {
   res.json({ success: true, categories: db.categories });
 });
 
-app.delete("/api/categories/:id", (req, res) => {
+app.delete("/api/categories/:id", requireManagerOrDeveloper, (req, res) => {
   const categoryId = req.params.id;
   const db = readDb();
   if (!db.categories) {

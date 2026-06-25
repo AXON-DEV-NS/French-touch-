@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Royal Navy Background -->
+  <rect width="100" height="100" rx="24" fill="#0A1C3A"/>
+  
+  <!-- Outer Elegance Ring -->
+  <circle cx="50" cy="50" r="42" fill="none" stroke="#D4AF37" stroke-width="2" stroke-dasharray="2 2"/>
+  <circle cx="50" cy="50" r="38" fill="none" stroke="#D4AF37" stroke-width="1" opacity="0.6"/>
+
+  <!-- Royal Fleur-de-lis & Chef Hat Emblem -->
+  <g transform="translate(50, 48) scale(0.9)">
+    <!-- Central Spear / Fork Blade -->
+    <path d="M 0,-25 C 2,-15 5,-5 12,0 C 5,2 2,12 0,22 C -2,12 -5,2 -12,0 C -5,-5 -2,-15 0,-25 Z" fill="#D4AF37"/>
+    
+    <!-- Left Wing (Fleur-de-lis petal) -->
+    <path d="M -2,-8 C -12,-18 -25,-12 -22,-2 C -18,4 -10,6 -2,5 C -5,11 -1,20 2,21" fill="none" stroke="#D4AF37" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M -2,-8 C -12,-18 -25,-12 -22,-2 C -18,4 -10,6 -2,5" fill="#D4AF37" opacity="0.9"/>
+    
+    <!-- Right Wing (Fleur-de-lis petal) -->
+    <path d="M 2,-8 C 12,-18 25,-12 22,-2 C 18,4 10,6 2,5 C 5,11 1,20 -2,21" fill="none" stroke="#D4AF37" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 2,-8 C 12,-18 25,-12 22,-2 C 18,4 10,6 2,5" fill="#D4AF37" opacity="0.9"/>
+
+    <!-- Bottom Ribbon / Band representing Chef Hat base -->
+    <path d="M -16,8 Q 0,11 16,8 Q 18,14 14,14 Q 0,16 -14,14 Q -18,14 -16,8 Z" fill="#D4AF37"/>
+    
+    <!-- Foundation Stars (Fine Dining Excellence) -->
+    <circle cx="0" cy="20" r="2.5" fill="#D4AF37"/>
+    <circle cx="-10" cy="18" r="2" fill="#D4AF37"/>
+    <circle cx="10" cy="18" r="2" fill="#D4AF37"/>
+  </g>
+</svg>

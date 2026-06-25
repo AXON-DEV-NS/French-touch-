@@ -78,7 +78,7 @@ export default function AdminManagerConsole({
   // Product form state (when editing or adding)
   const [isAddingNewProduct, setIsAddingNewProduct] = useState(false);
   const [pId, setPId] = useState('');
-  const [pCategory, setPCategory] = useState<string>('mains');
+  const [pCategory, setPCategory] = useState<string>('sandwiches');
   const [pPrice, setPPrice] = useState(100);
   const [pImage, setPImage] = useState('');
   
@@ -156,7 +156,7 @@ export default function AdminManagerConsole({
     setEditingProduct(null);
     setIsAddingNewProduct(true);
     setPId('p_' + Date.now());
-    setPCategory('mains');
+    setPCategory('sandwiches');
     setPPrice(150);
     setPImage('https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80');
     

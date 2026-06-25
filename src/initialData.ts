@@ -4,94 +4,164 @@ export const INITIAL_MANAGERS: Manager[] = [];
 
 export const INITIAL_PRODUCTS: Product[] = [
   {
-    id: 'p1',
+    id: 'p10',
     name: {
-      ar: 'سلطة كابريزي الكلاسيكية',
-      en: 'Classic Caprese Salad',
-      fr: 'Salade Caprese Classique',
-      it: 'Insalata Caprese Classica'
+      ar: 'سماش برجر فرنش تاتش كلاسيك',
+      en: 'Classic French Touch Smash',
+      fr: 'Smash Burger Classique French Touch',
+      it: 'Smash Burger Classico French Touch'
     },
     description: {
-      ar: 'شرائح طماطم طازجة، جبنة موزاريلا بوفالا، أوراق ريحان بري، وزيت زيتون بكر ممتاز مع بلسمك معتق.',
-      en: 'Fresh vine-ripened tomatoes, creamy buffalo mozzarella, wild sweet basil, and extra virgin olive oil drizzled with aged balsamic glaze.',
-      fr: 'Tomates fraîches bien mûres, mozzarella de bufflonne crémeuse, basilic sauvage et huile d\'olive extra vierge arrosée de glaçage balsamique vieilli.',
-      it: 'Pomodori freschi maturi, mozzarella di bufala cremosa, basilico selvatico fresco, olio extravergine d\'oliva e riduzione di aceto balsamico invecchiato.'
+      ar: 'شريحتان من لحم البلدي الفاخر المفروم طازجاً، مغطاة بجبنة شيدر الذائبة، شرائح مخلل مقرمشة، بصل مكرمل وصوص سماش السري الخاص بنا.',
+      en: 'Two fresh premium smash beef patties, topped with melted Cheddar, crunchy pickles, caramelized onions, and our secret house smash sauce.',
+      fr: 'Deux galettes de bœuf fraîches pressées, garnies de Cheddar fondu, cornichons croquants, oignons caramélisés et notre sauce secrète.',
+      it: 'Due polpette di manzo fresco schiacciate alla griglia, condite con Cheddar fuso, cetrioli croccanti, cipolle caramellate e salsa segreta.'
     },
-    price: 240,
-    category: 'appetizers',
-    image: 'https://images.unsplash.com/photo-1592417817098-8f3d6eb19675?auto=format&fit=crop&w=600&q=80'
+    price: 290,
+    category: 'sandwiches',
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80',
+    canHaveAddons: true,
+    canHaveSauces: true
   },
   {
-    id: 'p2',
+    id: 'p11',
     name: {
-      ar: 'حساء البصل الفرنسي الكلاسيكي',
-      en: 'Classic French Onion Soup',
-      fr: 'Soupe à l\'Oignon Classique',
-      it: 'Zuppa di Cipolle alla Francese'
+      ar: 'سماش برجر المشروم والترفل الفاخر',
+      en: 'Truffle Mushroom Smash',
+      fr: 'Smash Burger Truffe & Champignons',
+      it: 'Smash Burger Tartufo e Funghi'
     },
     description: {
-      ar: 'بصل مكرمل ببطء في مرق لحم غني، يعلوه خبز محمص فرنسي مقرمش وجبنة غرويير غنية تذوب بالفرن.',
-      en: 'Slow-caramelized sweet onions in a rich beef bone broth, topped with a crispy French baguette crouton and melted Gruyère cheese.',
-      fr: 'Oignons doux caramélisés lentement dans un riche bouillon de bœuf, garni d\'un crouton de baguette croustillante et de fromage Gruyère fondu.',
-      it: 'Cipolle dolci caramellate lentamente in brodo ristretto di manzo, con crostino di baguette croccante e formaggio Gruyère fuso.'
+      ar: 'شريحتان من اللحم البقري الطازج المقرمش، مغطاة بجبنة سويسرية غنية، مشروم سوتيه طازج، ورذاذ غني من مايونيز الترفل الأسود الفاخر.',
+      en: 'Two crispy seared smash beef patties, topped with premium Swiss cheese, fresh sautéed mushrooms, and a luxurious drizzle of black truffle mayonnaise.',
+      fr: 'Deux galettes de bœuf pressées croustillantes, garnies de fromage suisse de qualité supérieure, de champignons frais sautés et d\'un filet de mayonnaise à la truffe noire.',
+      it: 'Due polpette di manzo schiacciate e croccanti, sormontate da formaggio svizzero premium, funghi freschi saltati e un filo di maionese al tartufo nero.'
     },
-    price: 190,
-    category: 'appetizers',
-    image: 'https://images.unsplash.com/photo-1620418029653-8d0705f41656?auto=format&fit=crop&w=600&q=80'
+    price: 330,
+    category: 'sandwiches',
+    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=600&q=80',
+    canHaveAddons: true,
+    canHaveSauces: true
   },
   {
-    id: 'p3',
+    id: 'p12',
     name: {
-      ar: 'ستيك فيليه مينيون مع زبدة الترفل',
-      en: 'Filet Mignon with Truffle Butter',
-      fr: 'Filet Mignon au Beurre de Truffe',
-      it: 'Filet Mignon al Burro di Tartufo'
+      ar: 'ساندوتش دجاج باريسيان المقرمش',
+      en: 'Le Parisien Crispy Chicken Sandwich',
+      fr: 'Sandwich Poulet Croustillant Le Parisien',
+      it: 'Panino al Pollo Croccante Le Parisien'
     },
     description: {
-      ar: 'قطعة لحم فيليه مشوية ببراعة، مغطاة بزبدة الترفل الأسود الفاخرة، تقدم مع بطاطس مهروسة بالثوم المكرمل وخضار سوتيه.',
-      en: 'Tender grilled beef tenderloin topped with rich black truffle butter, served alongside roasted garlic mashed potatoes and glazed heirloom vegetables.',
-      fr: 'Tendre filet de bœuf grillé nappé d\'un riche beurre à la truffe noire, servi avec une purée de pommes de terre à l\'ail rôti et des légumes glacés.',
-      it: 'Tenerissimo filetto di manzo alla griglia sormontato da burro al tartufo nero, servito con purè di patate all\'aglio arrosto e verdure novelle glassate.'
+      ar: 'صدر دجاج مقرمش ذهبي متبل بالأعشاب، يعلوه جبنة سويسرية ذائبة، خس طازج، شرائح خيار مخلل، ومايونيز الثوم المقرمش بداخل خبز بريوش طازج.',
+      en: 'Golden crispy chicken breast seasoned with fine herbs, topped with melted Swiss cheese, fresh lettuce, pickles, and garlic aioli in a toasted brioche bun.',
+      fr: 'Blanc de poulet doré et croustillant assaisonné d\'herbes fines, garni de fromage suisse fondu, laitue fraîche, cornichons et aïoli à l\'ail dans un pain brioché grillé.',
+      it: 'Petto di pollo dorato e croccante condito con erbe aromatiche, sormontato da formaggio svizzero fuso, lattuga fresca, cetrioli e aioli all\'aglio in un soffice pan brioche.'
     },
-    price: 650,
-    category: 'mains',
-    image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80'
+    price: 260,
+    category: 'sandwiches',
+    image: 'https://images.unsplash.com/photo-1627662236973-4f8259fa2441?auto=format&fit=crop&w=600&q=80',
+    canHaveAddons: true,
+    canHaveSauces: true
   },
   {
-    id: 'p4',
+    id: 'p13',
     name: {
-      ar: 'لازانيا بولونيز بالفرن',
-      en: 'Baked Lasagna Bolognese',
-      fr: 'Lasagne Bolognaise au Four',
-      it: 'Lasagna Classica alla Bolognese'
+      ar: 'رول باجيت كوردون بلو الفاخر',
+      en: 'Premium Cordon Bleu Baguette Roll',
+      fr: 'Roulé Baguette Cordon Bleu Premium',
+      it: 'Rotolo di Cordon Bleu in Baguette'
     },
     description: {
-      ar: 'طبقات من باستا البيض الطازجة، صلصة بولونيز اللحم البقري المطهوة ببطء، صلصة البشاميل الكريمية، مغطاة بجبنة البارميزان المعتقة.',
-      en: 'Layers of fresh egg pasta sheets, slow-simmered beef ragù, creamy Béchamel sauce, baked to golden perfection with aged Parmigiano-Reggiano.',
-      fr: 'Couches de pâtes fraîches aux œufs, ragoût de bœuf mijoté, sauce béchamel crémeuse, cuites au four avec du Parmigiano-Reggiano vieilli.',
-      it: 'Sfoglia fresca all\'uovo, ragù bolognese di manzo a cottura lenta, besciamella cremosa, cotta al forno con Parmigiano-Reggiano 24 mesi.'
+      ar: 'صدور دجاج كوردون بلو مقرمشة ومحشوة بالجبنة الغنية والبيكون البقري، مع صلصة جبنة شيدر الكريمية وخس طازج في خبز باجيت فرنسي مقرمش.',
+      en: 'Crispy cordon bleu chicken rolls stuffed with premium cheese and beef bacon, layered with creamy Cheddar cheese sauce and fresh lettuce in a crusty French baguette.',
+      fr: 'Rouleaux de poulet cordon bleu croustillants farcis de fromage de qualité supérieure et de bacon de bœuf, recouverts d\'une sauce crémeuse au cheddar et de laitue fraîche dans une baguette française croustillante.',
+      it: 'Rotoli di cordon bleu di pollo croccanti ripieni di formaggio e bacon di manzo, con salsa cremosa al Cheddar e lattuga fresca in una baguette francese croccante.'
     },
-    price: 380,
-    category: 'mains',
-    image: 'https://images.unsplash.com/photo-1574894709920-11b28e7367e3?auto=format&fit=crop&w=600&q=80'
+    price: 285,
+    category: 'sandwiches',
+    image: 'https://images.unsplash.com/photo-1509722747041-616f39b57569?auto=format&fit=crop&w=600&q=80',
+    canHaveAddons: true,
+    canHaveSauces: true
   },
   {
-    id: 'p5',
+    id: 'p16',
     name: {
-      ar: 'كونفيت فخذ البط الفرنسي',
-      en: 'Crispy French Duck Confit',
-      fr: 'Confit de Canard Croustillant',
-      it: 'Coscia d\'Anatra Confit'
+      ar: 'ساندوتش دبل تشيز برجر باريس',
+      en: 'Double Paris Cheeseburger',
+      fr: 'Double Cheeseburger de Paris',
+      it: 'Double Paris Cheeseburger'
     },
     description: {
-      ar: 'فخذ بط مطبوخ ببطء في دهنه الخاص، ثم يُحمر حتى يصبح مقرمشاً، يقدم مع بطاطس مطهوة بصلصة إكليل الجبل الفواحة.',
-      en: 'Slow-cooked duck leg cured in its own fat, seared until perfectly crispy, served over fingerling potatoes roasted with rosemary and garlic.',
-      fr: 'Cuisse de canard confite dans sa propre graisse, saisie pour une peau croustillante, servie sur des pommes de terre sautées au romarin et à l\'ail.',
-      it: 'Coscia d\'anatra cotta lentamente nel suo grasso, poi dorata al forno fino a renderla croccante, servita con patate arrosto al rosmarino.'
+      ar: 'شريحتان من اللحم البقري الطازج المشوي على اللهب، دبل شيدر مستورد، بصل مكرمل فرنسي فاخر، ومسطردة ديجون بالذوق الفرنسي الرفيع.',
+      en: 'Two flame-grilled premium beef patties, double imported Cheddar, gourmet French caramelized onions, and refined Dijon honey mustard sauce.',
+      fr: 'Deux steaks hachés grillés de première qualité, double Cheddar importé, oignons caramélisés français gourmands, et sauce moutarde de Dijon affinée.',
+      it: 'Due polpette di manzo di prima scelta cotte alla griglia, doppio Cheddar importato, cipolle caramellate francesi gourmet e salsa di senape di Digione.'
     },
-    price: 520,
-    category: 'mains',
-    image: 'https://images.unsplash.com/photo-1514516345957-556ca7d90a29?auto=format&fit=crop&w=600&q=80'
+    price: 310,
+    category: 'sandwiches',
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80',
+    canHaveAddons: true,
+    canHaveSauces: true
+  },
+  {
+    id: 'p14',
+    name: {
+      ar: 'بطاطس بلجيكية مقرمشة مع الأعشاب',
+      en: 'Crispy Belgian Fries with Herbs',
+      fr: 'Frites Belges Croustillantes aux Herbes',
+      it: 'Patatine Belghe Croccanti alle Erbe'
+    },
+    description: {
+      ar: 'أصابع بطاطس بلجيكية سميكة مقلية مرتين لتصبح مقرمشة وذهبية تماماً من الخارج وطرية من الداخل، متبلة بملح البحر وأعشاب فرنسية برية عطرية.',
+      en: 'Thick-cut Belgian style potatoes, double-fried for ultimate crunch, fluffy inside, seasoned with sea salt and aromatic wild Provence herbs.',
+      fr: 'Pommes de terre de style belge coupées épaisses, doublement frites pour un croustillant ultime, assaisonnées de sel de mer et d\'herbes de Provence sauvages.',
+      it: 'Patate tagliate spesse in stile belga, fritte due volte per la massima croccantezza, morbide all\'interno, condite con sale marino ed erbe selvatiche di Provenza.'
+    },
+    price: 110,
+    category: 'fries',
+    image: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=600&q=80',
+    canHaveAddons: true,
+    canHaveSauces: false
+  },
+  {
+    id: 'p15',
+    name: {
+      ar: 'بطاطس بالترفل وجبنة البارميزان الفاخرة',
+      en: 'Truffle Parmesan Gourmet Fries',
+      fr: 'Frites Gourmet Truffe & Parmesan',
+      it: 'Patatine Gourmet al Tartufo e Parmigiano'
+    },
+    description: {
+      ar: 'أصابع البطاطس الذهبية المقرمشة مغمورة بزيت الترفل الأبيض النقي، يعلوها كمية سخية من جبنة البارميزان المعتقة المبشورة طازجاً وبقدونس مفروم.',
+      en: 'Crispy golden fries drizzled with aromatic pure white truffle oil, dusted generously with freshly grated aged Parmigiano-Reggiano and chopped Italian parsley.',
+      fr: 'Frites dorées et croustillantes arrosées d\'huile aromatique de truffe blanche pure, généreusement saupoudrées de Parmigiano-Reggiano vieilli fraîchement râpé et de persil italien haché.',
+      it: 'Patatine dorate croccanti irrorate con olio aromatico di tartufo bianco puro, generosamente spolverate con Parmigiano-Reggiano grattugiato fresco e prezzemolo tritato.'
+    },
+    price: 160,
+    category: 'fries',
+    image: 'https://images.unsplash.com/photo-1576107232684-1279f390859f?auto=format&fit=crop&w=600&q=80',
+    canHaveAddons: true,
+    canHaveSauces: false
+  },
+  {
+    id: 'p17',
+    name: {
+      ar: 'سويت بطاطس لودد بالجبنة',
+      en: 'Sweet Loaded Cheese Fries',
+      fr: 'Frites de Patate Douce au Fromage',
+      it: 'Patate Dolci Cariche di Formaggio'
+    },
+    description: {
+      ar: 'أصابع بطاطا حلوة سميكة ومقرمشة مغطاة بصوص الشيدر الساخن الذائب، هالبينو حار مفروم، وذرات لحم بقري مقرمش مع صوص فرنش تاتش السري.',
+      en: 'Crispy thick-cut sweet potato fries loaded with hot melted Cheddar cheese sauce, spicy minced jalapeños, crispy beef bacon bits, and our secret sauce.',
+      fr: 'Frites de patates douces épaisses et croustillantes garnies d\'une sauce au fromage Cheddar chaud fondu, de jalapeños épicés hachés, de bacon de bœuf croustillant et de notre sauce secrète.',
+      it: 'Patatine fritte di patate dolci spesse e croccanti ricoperte da salsa al formaggio Cheddar fuso, jalapeños tritati piccanti, pancetta di manzo croccante e la nostra salsa segreta.'
+    },
+    price: 150,
+    category: 'fries',
+    image: 'https://images.unsplash.com/photo-1576107232684-1279f390859f?auto=format&fit=crop&w=600&q=80',
+    canHaveAddons: true,
+    canHaveSauces: false
   },
   {
     id: 'p6',
@@ -164,126 +234,6 @@ export const INITIAL_PRODUCTS: Product[] = [
     price: 110,
     category: 'drinks',
     image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80'
-  },
-  {
-    id: 'p10',
-    name: {
-      ar: 'سماش برجر فرنش تاتش كلاسيك',
-      en: 'Classic French Touch Smash',
-      fr: 'Smash Burger Classique French Touch',
-      it: 'Smash Burger Classico French Touch'
-    },
-    description: {
-      ar: 'شريحتان من لحم البلدي الفاخر المفروم طازجاً، مغطاة بجبنة شيدر الذائبة، شرائح مخلل مقرمشة، بصل مكرمل وصوص سماش السري الخاص بنا.',
-      en: 'Two fresh premium smash beef patties, topped with melted Cheddar, crunchy pickles, caramelized onions, and our secret house smash sauce.',
-      fr: 'Deux galettes de bœuf fraîches pressées, garnies de Cheddar fondu, cornichons croquants, oignons caramélisés et notre sauce secrète.',
-      it: 'Due polpette di manzo fresco schiacciate alla griglia, condite con Cheddar fuso, cetrioli croccanti, cipolle caramellate e salsa segreta.'
-    },
-    price: 290,
-    category: 'mains',
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80',
-    canHaveAddons: true,
-    canHaveSauces: true
-  },
-  {
-    id: 'p11',
-    name: {
-      ar: 'سماش برجر المشروم والترفل الفاخر',
-      en: 'Truffle Mushroom Smash',
-      fr: 'Smash Burger Truffe & Champignons',
-      it: 'Smash Burger Tartufo e Funghi'
-    },
-    description: {
-      ar: 'شريحتان من اللحم البقري الطازج المقرمش، مغطاة بجبنة سويسرية غنية، مشروم سوتيه طازج، ورذاذ غني من مايونيز الترفل الأسود الفاخر.',
-      en: 'Two crispy seared smash beef patties, topped with premium Swiss cheese, fresh sautéed mushrooms, and a luxurious drizzle of black truffle mayonnaise.',
-      fr: 'Deux galettes de bœuf pressées croustillantes, garnies de fromage suisse de qualité supérieure, de champignons frais sautés et d\'un filet de mayonnaise à la truffe noire.',
-      it: 'Due polpette di manzo schiacciate e croccanti, sormontate da formaggio svizzero premium, funghi freschi saltati e un filo di maionese al tartufo nero.'
-    },
-    price: 330,
-    category: 'mains',
-    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=600&q=80',
-    canHaveAddons: true,
-    canHaveSauces: true
-  },
-  {
-    id: 'p12',
-    name: {
-      ar: 'ساندوتش دجاج باريسيان المقرمش',
-      en: 'Le Parisien Crispy Chicken Sandwich',
-      fr: 'Sandwich Poulet Croustillant Le Parisien',
-      it: 'Panino al Pollo Croccante Le Parisien'
-    },
-    description: {
-      ar: 'صدر دجاج مقرمش ذهبي متبل بالأعشاب، يعلوه جبنة سويسرية ذائبة، خس طازج، شرائح خيار مخلل، ومايونيز الثوم المقرمش بداخل خبز بريوش طازج.',
-      en: 'Golden crispy chicken breast seasoned with fine herbs, topped with melted Swiss cheese, fresh lettuce, pickles, and garlic aioli in a toasted brioche bun.',
-      fr: 'Blanc de poulet doré et croustillant assaisonné d\'herbes fines, garni de fromage suisse fondu, laitue fraîche, cornichons et aïoli à l\'ail dans un pain brioché grillé.',
-      it: 'Petto di pollo dorato e croccante condito con erbe aromatiche, sormontato da formaggio svizzero fuso, lattuga fresca, cetrioli e aioli all\'aglio in un soffice pan brioche.'
-    },
-    price: 260,
-    category: 'mains',
-    image: 'https://images.unsplash.com/photo-1627662236973-4f8259fa2441?auto=format&fit=crop&w=600&q=80',
-    canHaveAddons: true,
-    canHaveSauces: true
-  },
-  {
-    id: 'p13',
-    name: {
-      ar: 'رول باجيت كوردون بلو الفاخر',
-      en: 'Premium Cordon Bleu Baguette Roll',
-      fr: 'Roulé Baguette Cordon Bleu Premium',
-      it: 'Rotolo di Cordon Bleu in Baguette'
-    },
-    description: {
-      ar: 'صدور دجاج كوردون بلو مقرمشة ومحشوة بالجبنة الغنية والبيكون البقري، مع صلصة جبنة شيدر الكريمية وخس طازج في خبز باجيت فرنسي مقرمش.',
-      en: 'Crispy cordon bleu chicken rolls stuffed with premium cheese and beef bacon, layered with creamy Cheddar cheese sauce and fresh lettuce in a crusty French baguette.',
-      fr: 'Rouleaux de poulet cordon bleu croustillants farcis de fromage de qualité supérieure et de bacon de bœuf, recouverts d\'une sauce crémeuse au cheddar et de laitue fraîche dans une baguette française croustillante.',
-      it: 'Rotoli di cordon bleu di pollo croccanti ripieni di formaggio e bacon di manzo, con salsa cremosa al Cheddar e lattuga fresca in una baguette francese croccante.'
-    },
-    price: 285,
-    category: 'mains',
-    image: 'https://images.unsplash.com/photo-1509722747041-616f39b57569?auto=format&fit=crop&w=600&q=80',
-    canHaveAddons: true,
-    canHaveSauces: true
-  },
-  {
-    id: 'p14',
-    name: {
-      ar: 'بطاطس بلجيكية مقرمشة مع الأعشاب',
-      en: 'Crispy Belgian Fries with Herbs',
-      fr: 'Frites Belges Croustillantes aux Herbes',
-      it: 'Patatine Belghe Croccanti alle Erbe'
-    },
-    description: {
-      ar: 'أصابع بطاطس بلجيكية سميكة مقلية مرتين لتصبح مقرمشة وذهبية تماماً من الخارج وطرية من الداخل، متبلة بملح البحر وأعشاب فرنسية برية عطرية.',
-      en: 'Thick-cut Belgian style potatoes, double-fried for ultimate crunch, fluffy inside, seasoned with sea salt and aromatic wild Provence herbs.',
-      fr: 'Pommes de terre de style belge coupées épaisses, doublement frites pour un croustillant ultime, assaisonnées de sel de mer et d\'herbes de Provence sauvages.',
-      it: 'Patate tagliate spesse in stile belga, fritte due volte per la massima croccantezza, morbide all\'interno, condite con sale marino ed erbe selvatiche di Provenza.'
-    },
-    price: 110,
-    category: 'appetizers',
-    image: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=600&q=80',
-    canHaveAddons: true,
-    canHaveSauces: false
-  },
-  {
-    id: 'p15',
-    name: {
-      ar: 'بطاطس بالترفل وجبنة البارميزان الفاخرة',
-      en: 'Truffle Parmesan Gourmet Fries',
-      fr: 'Frites Gourmet Truffe & Parmesan',
-      it: 'Patatine Gourmet al Tartufo e Parmigiano'
-    },
-    description: {
-      ar: 'أصابع البطاطس الذهبية المقرمشة مغمورة بزيت الترفل الأبيض النقي، يعلوها كمية سخية من جبنة البارميزان المعتقة المبشورة طازجاً وبقدونس مفروم.',
-      en: 'Crispy golden fries drizzled with aromatic pure white truffle oil, dusted generously with freshly grated aged Parmigiano-Reggiano and chopped Italian parsley.',
-      fr: 'Frites dorées et croustillantes arrosées d\'huile aromatique de truffe blanche pure, généreusement saupoudrées de Parmigiano-Reggiano vieilli fraîchement râpé et de persil italien haché.',
-      it: 'Patatine dorate croccanti irrorate con olio aromatico di tartufo bianco puro, generosamente spolverate con Parmigiano-Reggiano grattugiato fresco e prezzemolo tritato.'
-    },
-    price: 160,
-    category: 'appetizers',
-    image: 'https://images.unsplash.com/photo-1576107232684-1279f390859f?auto=format&fit=crop&w=600&q=80',
-    canHaveAddons: true,
-    canHaveSauces: false
   }
 ];
 
@@ -337,6 +287,36 @@ export const INITIAL_ADDONS: CustomizeOption[] = [
       it: 'Jalapeños Piccanti (+10 EGP)'
     },
     price: 10
+  },
+  {
+    id: 'a6',
+    name: {
+      ar: 'بيض مقلي (+١٥ ج.م)',
+      en: 'Fried Egg (+15 EGP)',
+      fr: 'Oeuf au Plat (+15 EGP)',
+      it: 'Uovo Fritto (+15 EGP)'
+    },
+    price: 15
+  },
+  {
+    id: 'a7',
+    name: {
+      ar: 'شريحة لحم إضافية سماش (+٨٠ ج.م)',
+      en: 'Extra Smash Patty (+80 EGP)',
+      fr: 'Steak Haché Supplémentaire (+80 EGP)',
+      it: 'Polpetta Extra (+80 EGP)'
+    },
+    price: 80
+  },
+  {
+    id: 'a8',
+    name: {
+      ar: 'قطعة دجاج مقرمشة إضافية (+٧٠ ج.م)',
+      en: 'Extra Crispy Chicken (+70 EGP)',
+      fr: 'Poulet Croustillant Supplémentaire (+70 EGP)',
+      it: 'Pollo Croccante Extra (+70 EGP)'
+    },
+    price: 70
   }
 ];
 
@@ -390,6 +370,16 @@ export const INITIAL_SAUCES: CustomizeOption[] = [
       it: 'Salsa BBQ Affumicata (+10 EGP)'
     },
     price: 10
+  },
+  {
+    id: 's6',
+    name: {
+      ar: 'صوص الشيدر السائح الفاخر (+٢٠ ج.م)',
+      en: 'Melted Cheddar Sauce (+20 EGP)',
+      fr: 'Sauce Cheddar Fondue (+20 EGP)',
+      it: 'Salsa Cheddar Fusa (+20 EGP)'
+    },
+    price: 20
   }
 ];
 
@@ -400,20 +390,20 @@ tomorrowDate.setHours(tomorrowDate.getHours() + 14);
 export const INITIAL_EXCLUSIVE_OFFER: ExclusiveOffer = {
   id: 'o1',
   title: {
-    ar: 'مهرجان التذوق الملكي الفرنسي الإيطالي',
-    en: 'The Royal French-Italian Tasting Feast',
-    fr: 'Le Festin Royal Franco-Italien',
-    it: 'La Festa Reale Franco-Italiana'
+    ar: 'مهرجان التذوق الملكي فرنش تاتش',
+    en: 'The Royal French Touch Feast',
+    fr: 'Le Festin Royal French Touch',
+    it: 'La Festa Reale French Touch'
   },
   description: {
-    ar: 'احصل على خصم ٢٥٪ كامل على باقة تذوق فاخرة لشخصين تشمل المقبلات، الأطباق الرئيسية، والحلويات المستوحاة من الريف الفرنسي ومقاطعة توسكانا الإيطالية.',
-    en: 'Receive a full 25% discount on a gourmet 3-course tasting menu for two, incorporating handpicked delicacies from Paris to Tuscany.',
-    fr: 'Bénéficiez d\'une réduction de 25% sur un menu dégustation gastronomique en 3 services pour deux personnes, de Paris à la Toscane.',
-    it: 'Ricevi uno sconto speciale del 25% su un menu degustazione di 3 portate per due persone, ispirato ai sapori di Parigi e della Toscana.'
+    ar: 'احصل على خصم ٢٥٪ كامل على وجبة سماش برجر مزدوجة مع بطاطس الترفل الفاخرة ومشروب اللافندر الفواح.',
+    en: 'Receive a full 25% discount on a premium combo of double smash burger, truffle parmesan fries, and fresh lavender lemonade.',
+    fr: 'Bénéficiez d\'une réduction de 25% sur un combo premium comprenant un double smash burger, des frites à la truffe et du parmesan, et une limonade à la lavande.',
+    it: 'Ricevi uno sconto speciale del 25% su una combinazione premium di double smash burger, patatine al tartufo e parmigiano e limonata alla lavanda.'
   },
   discount: '25%',
   endTime: tomorrowDate.toISOString(),
-  image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80',
+  image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80',
   active: true
 };
 
@@ -421,18 +411,18 @@ export const INITIAL_WEEKLY_OFFERS: WeeklyOffer[] = [
   {
     dayOfWeek: 0, // Sunday
     title: {
-      ar: 'غداء الأحد العائلي الإيطالي',
-      en: 'Italian Family Sunday Lunch',
-      fr: 'Déjeuner Familial Italien du Dimanche',
-      it: 'Pranzo della Domenica in Famiglia'
+      ar: 'عرض الأحد العائلي السعيد',
+      en: 'Sunday Family Smash Feast',
+      fr: 'Festin de Famille du Dimanche',
+      it: 'Festa di Famiglia della Domenica'
     },
     description: {
-      ar: 'اطلب طبقين رئيسيين واحصل على مقبلات كابريزي ومشروبين مجاناً لتستمتع مع عائلتك بدفء إيطاليا.',
-      en: 'Order two main courses and receive a complimentary Caprese appetizer and two drinks to share.',
-      fr: 'Commandez deux plats principaux et recevez une entrée Caprese et deux boissons gratuites à partager.',
-      it: 'Ordina due piatti principali e ricevi un antipasto Caprese e due bevande in omaggio da condividere.'
+      ar: 'اطلب أي ساندوتشين برجر أو تشيكن واحصل على بطاطس بلجيكية كبيرة ومشروبين مجاناً.',
+      en: 'Order any two burgers or chicken sandwiches and receive a complimentary large Belgian fries and two drinks.',
+      fr: 'Commandez deux burgers ou sandwiches au poulet et recevez une grande frite belge et deux boissons gratuites.',
+      it: 'Ordina due hamburger o panini al pollo e ricevi patatine belghe grandi e due bevande in omaggio.'
     },
-    discount: 'Free Appetizer & Drinks',
+    discount: 'Free Fries & Drinks',
     active: true
   },
   {
@@ -455,35 +445,35 @@ export const INITIAL_WEEKLY_OFFERS: WeeklyOffer[] = [
   {
     dayOfWeek: 2, // Tuesday
     title: {
-      ar: 'ثلاثاء الباستا الإيطالية الطازجة',
-      en: 'Fresh Pasta Tuesdays',
-      fr: 'Mardi Pâtes Fraîches Maison',
-      it: 'Martedì della Pasta Fresca'
+      ar: 'ثلاثاء البطاطس الذهبية والخصم الخاص',
+      en: 'Golden Fries Tuesday',
+      fr: 'Mardi des Frites Dorées',
+      it: 'Martedì delle Patatine Dorate'
     },
     description: {
-      ar: 'خصم ٢٠٪ على كافة أطباق الباستا واللازانيا الإيطالية الطازجة المحضرة يدوياً في مطبخنا.',
-      en: 'Enjoy a delicious 20% discount on all our handmade fresh pasta and lasagna options.',
-      fr: 'Profitez d\'une réduction de 20% sur toutes nos pâtes fraîches maison et nos lasagnes.',
-      it: 'Goditi uno sconto speciale del 20% su tutte le nostre paste fresche fatte a mano e lasagne.'
+      ar: 'احصل على خصم ٣٠٪ على بطاطس الترفل والبارميزان أو البطاطس لودد بالجبنة عند طلب أي ساندوتش.',
+      en: 'Get a 30% discount on Truffle Parmesan Fries or Sweet Loaded Cheese Fries with any sandwich purchase.',
+      fr: 'Profitez d\'une réduction de 30% sur les frites à la truffe ou au fromage pour l\'achat d\'un sandwich.',
+      it: 'Ricevi uno sconto del 30% sulle patatine al tartufo o cariche di formaggio acquistando un panino.'
     },
-    discount: '20% OFF Pasta',
+    discount: '30% OFF Fries',
     active: true
   },
   {
     dayOfWeek: 3, // Wednesday
     title: {
-      ar: 'أربعاء شريحة اللحم الفرنسية الفاخرة',
-      en: 'French Steakhouse Wednesdays',
-      fr: 'Mercredi Steakhouse Français',
-      it: 'Mercoledì della Bistecca Francese'
+      ar: 'أربعاء السماش والبرجر المزدوج',
+      en: 'Double Smash Wednesdays',
+      fr: 'Mercredi Double Smash',
+      it: 'Mercoledì Double Smash'
     },
     description: {
-      ar: 'خصم خاص ١٥٪ على طبق ستيك فيليه مينيون ببطاطس الثوم المكرمل وزبدة الترفل الشهيرة.',
-      en: 'Savor our signature Filet Mignon with truffle butter at an exclusive 15% promotional discount.',
-      fr: 'Savourez notre filet mignon signature au beurre de truffe avec une réduction exclusive de 15%.',
-      it: 'Assapora il nostro Filet Mignon al burro di tartufo con uno sconto promozionale del 15%.'
+      ar: 'خصم خاص ١٥٪ على ساندوتش دبل تشيز برجر باريس أو سماش برجر فرنش تاتش كلاسيك.',
+      en: 'Savor our signature Double Paris Cheeseburger or Classic Smash at an exclusive 15% promotional discount.',
+      fr: 'Savourez notre Double Paris Cheeseburger ou Classic Smash avec une réduction exclusive de 15%.',
+      it: 'Assapora il nostro Double Paris Cheeseburger o Classic Smash con uno sconto promozionale del 15%.'
     },
-    discount: '15% OFF Steak',
+    discount: '15% OFF Smash',
     active: true
   },
   {
@@ -506,18 +496,18 @@ export const INITIAL_WEEKLY_OFFERS: WeeklyOffer[] = [
   {
     dayOfWeek: 5, // Friday
     title: {
-      ar: 'جمعة المأكولات البحرية المتوسطية',
-      en: 'Mediterranean Seafood Friday',
-      fr: 'Vendredi des Fruits de Mer Méditerranéens',
-      it: 'Venerdì del Pesce Mediterraneo'
+      ar: 'جمعة اللمة والتحميل اللذيذ',
+      en: 'Loaded Friday Party',
+      fr: 'Vendredi des Frites Chargées',
+      it: 'Venerdì delle Patate Cariche'
     },
     description: {
-      ar: 'ترقبوا أطباقاً بحرية مستوحاة من شواطئ نيس الفرنسية وساحل أمالفي الإيطالي يطرحها الشيف خصيصاً كل جمعة.',
-      en: 'Indulge in special off-menu seafood delicacies inspired by the French Riviera and Amalfi coast.',
-      fr: 'Savourez nos spécialités de poissons et fruits de mer inspirées de la Côte d\'Azur et de la côte amalfitaine.',
-      it: 'Fatti tentare dai piatti speciali fuori menu ispirati alla Costiera Amalfitana e alla Costa Azzurra.'
+      ar: 'اطلب أي ساندوتشين لودد واحصل على بطاطس لودد بالجبنة مجاناً بالكامل لتستمتع مع أصدقائك بليلة رائعة.',
+      en: 'Order any two loaded sandwiches and get a free Sweet Loaded Cheese Fries to share with your friends.',
+      fr: 'Commandez deux sandwiches chargés et recevez une frite de patate douce au fromage gratuite à partager.',
+      it: 'Ordina due panini carichi e ricevi patate dolci cariche di formaggio in omaggio da condividere.'
     },
-    discount: 'Chef\'s Special Platters',
+    discount: 'Free Loaded Fries',
     active: true
   },
   {

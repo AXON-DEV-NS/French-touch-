@@ -101,7 +101,7 @@ export default function MenuSection({
   onAddToCart,
   categories = []
 }: MenuSectionProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>('mains');
+  const [selectedCategory, setSelectedCategory] = useState<string>('sandwiches');
   const t = TRANSLATIONS[currentLang];
 
   // Sync selectedCategory when categories are loaded or updated
@@ -197,7 +197,7 @@ export default function MenuSection({
 
                 {/* Aesthetic Circular Flag Border & Category Label */}
                 <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm text-[10px] font-bold tracking-wider text-brand-blue px-3 py-1 rounded-full shadow-sm border border-brand-gold/20">
-                  {t.categories[product.category].toUpperCase()}
+                  {((t.categories as any)[product.category] || product.category || '').toUpperCase()}
                 </div>
 
                 {/* Elegant central visual line accent on image hover */}
