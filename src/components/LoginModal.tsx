@@ -6,7 +6,7 @@ interface LoginModalProps {
   currentLang: Language;
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: (email: string, name: string, role: "Developer" | "Manager") => void;
+  onLoginSuccess: (email: string, name: string, role: "Developer" | "Manager", lang?: Language) => void;
 }
 
 export default function LoginModal({
@@ -63,7 +63,7 @@ export default function LoginModal({
         throw new Error(data.error || 'فشلت المصادقة');
       }
 
-      onLoginSuccess(data.user.email, data.user.name, 'Manager');
+      onLoginSuccess(data.user.email, data.user.name, 'Manager', data.user.lang);
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || (currentLang === 'ar' ? 'حدث خطأ أثناء الاتصال بالخادم.' : 'An error occurred while connecting.'));

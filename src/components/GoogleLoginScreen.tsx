@@ -14,7 +14,7 @@ import { auth, googleProvider } from "../lib/firebase";
 
 interface GoogleLoginScreenProps {
   currentLang: Language;
-  onLoginSuccess: (user: { email: string; name: string; picture?: string; role: "Developer" | "Manager" | "Customer" }) => void;
+  onLoginSuccess: (user: { email: string; name: string; picture?: string; role: "Developer" | "Manager" | "Customer"; lang?: Language }) => void;
 }
 
 export default function GoogleLoginScreen({ currentLang, onLoginSuccess }: GoogleLoginScreenProps) {

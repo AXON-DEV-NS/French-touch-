@@ -19,7 +19,7 @@ interface AdminManagerConsoleProps {
   weeklyOffers: WeeklyOffer[];
   activeTab: 'products' | 'offers' | 'super';
   setActiveTab: (tab: 'products' | 'offers' | 'super') => void;
-  onAddManager: (email: string, name: string) => void;
+  onAddManager: (email: string, name: string, password?: string, lang?: Language) => void;
   onRemoveManager: (email: string) => void;
   onSaveProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
@@ -62,6 +62,8 @@ export default function AdminManagerConsole({
   // New Manager form state
   const [newManagerEmail, setNewManagerEmail] = useState('');
   const [newManagerName, setNewManagerName] = useState('');
+  const [newManagerPassword, setNewManagerPassword] = useState('123');
+  const [newManagerLang, setNewManagerLang] = useState<Language>('ar');
   const [managerError, setManagerError] = useState('');
 
   // Dynamic Category form state
@@ -306,7 +308,7 @@ export default function AdminManagerConsole({
   const handleAddManagerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setManagerError('');
-    if (!newManagerEmail || !newManagerName) {
+    if (!newManagerEmail || !newManagerName || !newManagerPassword) {
       setManagerError('All fields are required.');
       return;
     }
@@ -314,9 +316,11 @@ export default function AdminManagerConsole({
       setManagerError('Please enter a valid email.');
       return;
     }
-    onAddManager(newManagerEmail.trim().toLowerCase(), newManagerName.trim());
+    onAddManager(newManagerEmail.trim().toLowerCase(), newManagerName.trim(), newManagerPassword.trim(), newManagerLang);
     setNewManagerEmail('');
     setNewManagerName('');
+    setNewManagerPassword('123');
+    setNewManagerLang('ar');
   };
 
   const currentDayOfWeek = new Date().getDay();
@@ -1235,6 +1239,34 @@ export default function AdminManagerConsole({
                 />
               </div>
 
+              <div>
+                <label className="block text-[10px] font-bold text-brand-blue mb-1">Manager Entry Password (كلمة مرور الدخول)</label>
+                <input
+                  type="text"
+                  value={newManagerPassword}
+                  onChange={(e) => setNewManagerPassword(e.target.value)}
+                  placeholder="e.g. 123"
+                  required
+                  className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue font-mono"
+                />
+                <p className="text-[9px] text-gray-400 mt-1">Default is '123' if not changed.</p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-brand-blue mb-1">Manager Interface Language (لغة واجهة المدير)</label>
+                <select
+                  value={newManagerLang}
+                  onChange={(e) => setNewManagerLang(e.target.value as Language)}
+                  className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue font-medium"
+                >
+                  <option value="ar">العربية (Arabic) 🇪🇬</option>
+                  <option value="en">English 🇬🇧</option>
+                  <option value="fr">Français (French) 🇫🇷</option>
+                  <option value="it">Italiano (Italian) 🇮🇹</option>
+                </select>
+                <p className="text-[9px] text-gray-400 mt-1">This language will be locked for this manager.</p>
+              </div>
+
               <button
                 type="submit"
                 className="w-full py-3 bg-brand-red text-white hover:bg-brand-red/90 font-bold rounded-xl text-xs transition-colors"
@@ -1254,7 +1286,17 @@ export default function AdminManagerConsole({
                   <div key={m.email} className="p-3 bg-white border border-gray-100 rounded-xl flex items-center justify-between gap-4 text-xs shadow-sm">
                     <div>
                       <p className="font-bold text-brand-blue">{m.name}</p>
-                      <p className="text-[10px] text-gray-500 font-mono mt-0.5">{m.email}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-gray-500 font-mono">{m.email}</span>
+                        {m.password && (
+                          <span className="px-1.5 py-0.5 bg-slate-100 text-stone-600 text-[9px] font-mono rounded border border-slate-200">
+                            Pass: {m.password}
+                          </span>
+                        )}
+                        <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 text-[9px] font-bold rounded border border-amber-100 flex items-center gap-0.5">
+                          🌐 {m.lang ? m.lang.toUpperCase() : 'AR'}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Cannot remove Super Admin from list to avoid lock-outs */}

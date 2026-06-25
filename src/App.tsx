@@ -122,7 +122,7 @@ export default function App() {
   });
 
   // --- Current Signed in User State ---
-  const [currentUser, setCurrentUser] = useState<{ email: string; name: string; picture?: string; role: 'Developer' | 'Manager' | 'Customer' } | null>(() => {
+  const [currentUser, setCurrentUser] = useState<{ email: string; name: string; picture?: string; role: 'Developer' | 'Manager' | 'Customer'; lang?: Language } | null>(() => {
     const saved = safeSessionStorage.getItem('frenchtouch_current_user');
     return saved ? JSON.parse(saved) : null;
   });
@@ -137,6 +137,14 @@ export default function App() {
   useEffect(() => {
     if (currentUser?.role) {
       setPreviewRole(currentUser.role);
+    }
+  }, [currentUser]);
+
+  // Synchronize language for managers and prevent changes
+  useEffect(() => {
+    if (currentUser?.role === 'Manager' && currentUser?.lang) {
+      setCurrentLang(currentUser.lang);
+      safeStorage.setItem('frenchtouch_lang', currentUser.lang);
     }
   }, [currentUser]);
 
@@ -237,6 +245,25 @@ export default function App() {
       .catch(err => console.warn('Failed to fetch categories, using robust default categories instead:', err));
   }, []);
 
+  // Fetch authorized managers from server-side database
+  useEffect(() => {
+    fetch('/api/managers')
+      .then(res => {
+        if (!res.ok) throw new Error('Not ok');
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return res.json();
+        }
+        throw new Error('Not JSON');
+      })
+      .then(data => {
+        if (Array.isArray(data)) {
+          setManagers(data);
+        }
+      })
+      .catch(err => console.warn('Failed to fetch managers from server:', err));
+  }, []);
+
   useEffect(() => {
     safeStorage.setItem('frenchtouch_products', JSON.stringify(products));
   }, [products]);
@@ -285,13 +312,17 @@ export default function App() {
   const isManager = activeRole === 'Manager' || activeRole === 'Developer' || currentUser?.email === 'oren.on.oren.25@gmail.com';
   const isSuperAdmin = activeRole === 'Developer' || currentUser?.email === 'oren.on.oren.25@gmail.com';
 
-  const handleLoginSuccess = (user: { email: string; name: string; picture?: string; role: 'Developer' | 'Manager' | 'Customer' }) => {
+  const handleLoginSuccess = (user: { email: string; name: string; picture?: string; role: 'Developer' | 'Manager' | 'Customer'; lang?: Language }) => {
     setCurrentUser(user);
     if (user.role === 'Developer') {
       setPreviewRole('Developer');
     } else if (user.role === 'Manager') {
       setActiveAppTab('admin');
       setIsAdminConsoleVisible(true);
+      if (user.lang) {
+        setCurrentLang(user.lang);
+        safeStorage.setItem('frenchtouch_lang', user.lang);
+      }
     } else {
       setActiveAppTab('dashboard');
       setIsAdminConsoleVisible(false);
@@ -306,22 +337,50 @@ export default function App() {
   };
 
   // --- Action Handlers ---
-  const handleAddManager = (email: string, name: string) => {
-    if (managers.some(m => m.email.toLowerCase() === email.toLowerCase())) {
-      alert("This manager is already authorized.");
+  const handleAddManager = async (email: string, name: string, password?: string, lang?: Language) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim() || cleanEmail.split('@')[0];
+    const cleanPassword = password?.trim() || '123';
+    const cleanLang = lang || 'ar';
+    if (managers.some(m => m.email.toLowerCase() === cleanEmail)) {
+      alert(currentLang === 'ar' ? "هذا المدير مضاف بالفعل في النظام." : "This manager is already authorized.");
       return;
     }
-    const newM: Manager = {
-      email,
-      name,
-      addedAt: new Date().toISOString()
-    };
-    setManagers([...managers, newM]);
+    try {
+      const res = await fetch('/api/managers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, name: cleanName, password: cleanPassword, lang: cleanLang })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to add manager');
+      }
+      if (Array.isArray(data.managers)) {
+        setManagers(data.managers);
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to add manager on the server.");
+    }
   };
 
-  const handleRemoveManager = (email: string) => {
-    if (email === 'oren.on.oren.25@gmail.com') return;
-    setManagers(managers.filter(m => m.email !== email));
+  const handleRemoveManager = async (email: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail === 'oren.on.oren.25@gmail.com') return;
+    try {
+      const res = await fetch(`/api/managers/${encodeURIComponent(cleanEmail)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to remove manager');
+      }
+      if (Array.isArray(data.managers)) {
+        setManagers(data.managers);
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to remove manager on the server.");
+    }
   };
 
   const handleSaveProduct = (product: Product) => {
@@ -511,7 +570,7 @@ export default function App() {
     }
   };
 
-  if (!entered) {
+  if (!entered && currentUser?.role !== 'Manager') {
     return (
       <LanguageLandingScreen
         onSelectLanguage={(lang) => {
@@ -547,6 +606,10 @@ export default function App() {
       />
     );
   }
+
+  const visibleLanguages = currentUser?.role === 'Manager'
+    ? LANGUAGES.filter((l) => l.code === currentLang)
+    : LANGUAGES;
 
   // Calculate cart total items count
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -595,43 +658,61 @@ export default function App() {
 
           {/* Header Center: Language Selectors + Intro Replay */}
           <div className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
-            {LANGUAGES.map((lang) => (
+            {visibleLanguages.map((lang) => (
               <button
                 key={lang.code}
-                onClick={() => setCurrentLang(lang.code)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                onClick={() => {
+                  if (currentUser?.role !== 'Manager') {
+                    setCurrentLang(lang.code);
+                  }
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                   currentLang === lang.code
                     ? 'bg-brand-blue text-brand-gold shadow-sm font-mono'
                     : 'text-slate-600 hover:bg-slate-200'
                 }`}
+                disabled={currentUser?.role === 'Manager'}
               >
-                {lang.name.split(' ')[0]} {lang.flag}
+                <span>{lang.name.split(' ')[0]} {lang.flag}</span>
+                {currentUser?.role === 'Manager' && <Lock className="w-3 h-3 text-brand-gold ml-1" />}
               </button>
             ))}
             
             {/* Sparkling Welcome Screen Replay Button */}
-            <button
-              onClick={() => setEntered(false)}
-              className="p-1 px-2 text-[10px] uppercase font-bold text-amber-600 hover:bg-amber-500/10 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
-              title={currentLang === 'ar' ? 'أعد عرض شاشة الترحيب' : 'Replay intro welcome screen'}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-              <span>{currentLang === 'ar' ? 'التقديم' : currentLang === 'fr' ? 'Accueil' : 'Intro'}</span>
-            </button>
+            {currentUser?.role !== 'Manager' && (
+              <button
+                onClick={() => setEntered(false)}
+                className="p-1 px-2 text-[10px] uppercase font-bold text-amber-600 hover:bg-amber-500/10 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                title={currentLang === 'ar' ? 'أعد عرض شاشة الترحيب' : 'Replay intro welcome screen'}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                <span>{currentLang === 'ar' ? 'التقديم' : currentLang === 'fr' ? 'Accueil' : 'Intro'}</span>
+              </button>
+            )}
           </div>
 
           {/* Mobile Language Selector (Visible on Mobile Only) */}
           <div className="flex md:hidden items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200/50">
-            {LANGUAGES.map((lang) => (
+            {visibleLanguages.map((lang) => (
               <button
                 key={lang.code}
-                onClick={() => setCurrentLang(lang.code)}
-                className={`w-6.5 h-6.5 flex items-center justify-center text-sm rounded-lg transition-all cursor-pointer ${
+                onClick={() => {
+                  if (currentUser?.role !== 'Manager') {
+                    setCurrentLang(lang.code);
+                  }
+                }}
+                className={`w-6.5 h-6.5 flex items-center justify-center text-sm rounded-lg transition-all cursor-pointer relative ${
                   currentLang === lang.code ? 'bg-brand-blue text-brand-gold scale-105 shadow-sm' : 'opacity-65 hover:opacity-100'
                 }`}
                 title={lang.name}
+                disabled={currentUser?.role === 'Manager'}
               >
                 {lang.flag}
+                {currentUser?.role === 'Manager' && (
+                  <span className="absolute -bottom-1 -right-1 bg-brand-gold text-brand-blue rounded-full p-0.5 scale-75">
+                    <Lock className="w-2.5 h-2.5" />
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -1647,11 +1728,12 @@ export default function App() {
         currentLang={currentLang}
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
-        onLoginSuccess={(email, name, role) => {
+        onLoginSuccess={(email, name, role, lang) => {
           handleLoginSuccess({ 
             email, 
             name, 
-            role
+            role,
+            lang
           });
         }}
       />

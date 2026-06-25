@@ -28,6 +28,7 @@ interface ManagerObj {
   name: string;
   addedAt: string;
   password?: string;
+  lang?: string;
 }
 
 interface DbSchema {
@@ -87,11 +88,6 @@ function readDb(): DbSchema {
         }
         return m;
       });
-      // Clear legacy hardcoded admins if requested
-      if (parsed.managers.some((m: any) => m.email === "uvyffi5@gmail.com" || m.email === "manager@frenchtouch.com")) {
-        parsed.managers = parsed.managers.filter((m: any) => m.email !== "uvyffi5@gmail.com" && m.email !== "manager@frenchtouch.com");
-        changed = true;
-      }
     } else {
       parsed.managers = [];
       changed = true;
@@ -193,13 +189,15 @@ app.get(["/auth/google/callback", "/auth/google/callback/"], async (req, res) =>
 
     // Determine Role
     let role: "Developer" | "Manager" | "Customer" = "Customer";
+    let managerLang: string | undefined = undefined;
     if (email === "oren.on.oren.25@gmail.com") {
       role = "Developer";
     } else {
       const db = readDb();
-      const isManager = db.managers.some(m => m.email.toLowerCase() === email);
-      if (isManager) {
+      const manager = db.managers.find(m => m.email.toLowerCase() === email);
+      if (manager) {
         role = "Manager";
+        managerLang = manager.lang || "ar";
       }
     }
 
@@ -237,7 +235,8 @@ app.get(["/auth/google/callback", "/auth/google/callback/"], async (req, res) =>
                   email: ${JSON.stringify(email)},
                   name: ${JSON.stringify(name)},
                   picture: ${JSON.stringify(picture)},
-                  role: ${JSON.stringify(role)}
+                  role: ${JSON.stringify(role)},
+                  lang: ${JSON.stringify(managerLang)}
                 },
                 idToken: ${JSON.stringify(tokens.id_token || null)}
               }, "*");
@@ -268,13 +267,15 @@ app.post("/api/auth/sandbox", (req, res) => {
 
   // Determine Role
   let role: "Developer" | "Manager" | "Customer" = "Customer";
+  let managerLang: string | undefined = undefined;
   if (cleanEmail === "oren.on.oren.25@gmail.com") {
     role = "Developer";
   } else {
     const db = readDb();
-    const isManager = db.managers.some(m => m.email.toLowerCase() === cleanEmail);
-    if (isManager) {
+    const manager = db.managers.find(m => m.email.toLowerCase() === cleanEmail);
+    if (manager) {
       role = "Manager";
+      managerLang = manager.lang || "ar";
     }
   }
 
@@ -297,7 +298,8 @@ app.post("/api/auth/sandbox", (req, res) => {
     email: cleanEmail,
     name: cleanName,
     picture: newVisitor.picture,
-    role
+    role,
+    lang: managerLang
   });
 });
 
@@ -314,13 +316,15 @@ app.post("/api/auth/firebase-login", (req, res) => {
 
   // Determine Role
   let role: "Developer" | "Manager" | "Customer" = "Customer";
+  let managerLang: string | undefined = undefined;
   if (cleanEmail === "oren.on.oren.25@gmail.com") {
     role = "Developer";
   } else {
     const db = readDb();
-    const isManager = db.managers.some(m => m.email.toLowerCase() === cleanEmail);
-    if (isManager) {
+    const manager = db.managers.find(m => m.email.toLowerCase() === cleanEmail);
+    if (manager) {
       role = "Manager";
+      managerLang = manager.lang || "ar";
     }
   }
 
@@ -343,7 +347,8 @@ app.post("/api/auth/firebase-login", (req, res) => {
     email: cleanEmail,
     name: cleanName,
     picture: newVisitor.picture,
-    role
+    role,
+    lang: managerLang
   });
 });
 
@@ -354,7 +359,7 @@ app.get("/api/managers", (req, res) => {
 });
 
 app.post("/api/managers", (req, res) => {
-  const { email, name, password } = req.body;
+  const { email, name, password, lang } = req.body;
   if (!email) {
     return res.status(400).json({ error: "Email is required" });
   }
@@ -362,6 +367,7 @@ app.post("/api/managers", (req, res) => {
   const cleanEmail = email.trim().toLowerCase();
   const cleanName = name?.trim() || cleanEmail.split("@")[0];
   const cleanPassword = password?.trim() || "123";
+  const cleanLang = lang || "ar";
   const db = readDb();
 
   if (db.managers.some(m => m.email.toLowerCase() === cleanEmail)) {
@@ -372,6 +378,7 @@ app.post("/api/managers", (req, res) => {
     email: cleanEmail,
     name: cleanName,
     password: cleanPassword,
+    lang: cleanLang,
     addedAt: new Date().toISOString()
   };
 
@@ -429,7 +436,8 @@ app.post("/api/auth/manager-login", (req, res) => {
       email: cleanEmail,
       name: manager.name,
       role: "Manager",
-      picture: newVisitor.picture
+      picture: newVisitor.picture,
+      lang: manager.lang || "ar"
     }
   });
 });
