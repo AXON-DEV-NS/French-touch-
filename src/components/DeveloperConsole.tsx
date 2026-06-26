@@ -3,7 +3,8 @@ import { motion } from "motion/react";
 import { 
   Users, UserCheck, Trash2, PlusCircle, LayoutDashboard, 
   Sparkles, Globe, LogOut, Check, HelpCircle, Key, 
-  Database, RefreshCw, Eye, Landmark, ArrowLeftRight, Mail, Send
+  Database, RefreshCw, Eye, Landmark, ArrowLeftRight, Mail, Send,
+  ShieldAlert, ShieldCheck
 } from "lucide-react";
 import { Language, TRANSLATIONS, Manager } from "../types";
 
@@ -16,6 +17,25 @@ interface VisitorLog {
   userAgent?: string;
   authType: "google" | "sandbox" | "firebase-google";
   role: "Developer" | "Manager" | "Customer";
+}
+
+interface RegisteredCustomer {
+  firstName: string;
+  secondName: string;
+  thirdName: string;
+  phone: string;
+  alternativePhone: string;
+  email: string;
+  picture: string;
+  registeredAt: string;
+}
+
+interface EmailLog {
+  toEmail: string;
+  subject: string;
+  body: string;
+  sentAt: string;
+  status: string;
 }
 
 interface DeveloperConsoleProps {
@@ -40,6 +60,9 @@ export default function DeveloperConsole({
   const [visitors, setVisitors] = useState<VisitorLog[]>([]);
   const [managers, setManagers] = useState<Manager[]>([]);
   const [subscribers, setSubscribers] = useState<string[]>([]);
+  const [customers, setCustomers] = useState<RegisteredCustomer[]>([]);
+  const [blockedCustomers, setBlockedCustomers] = useState<RegisteredCustomer[]>([]);
+  const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
   
   const [newManagerEmail, setNewManagerEmail] = useState("");
   const [newManagerName, setNewManagerName] = useState("");
@@ -53,7 +76,7 @@ export default function DeveloperConsole({
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [loadingManagers, setLoadingManagers] = useState(false);
   const [pageViews, setPageViews] = useState(0);
-  const [activeConsoleTab, setActiveConsoleTab] = useState<"logs" | "gmails" | "subscribers">("logs");
+  const [activeConsoleTab, setActiveConsoleTab] = useState<"logs" | "gmails" | "subscribers" | "customers" | "emaillogs">("customers");
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // Fetch visitors and managers from full-stack server
@@ -84,11 +107,82 @@ export default function DeveloperConsole({
       if (!subscribersRes.ok) throw new Error("Unauthorized");
       const subscribersData = await subscribersRes.json();
       setSubscribers(subscribersData);
+
+      const customersRes = await fetch("/api/registered-customers", { headers });
+      if (customersRes.ok) {
+        const customersData = await customersRes.json();
+        setCustomers(customersData);
+      }
+
+      const blockedRes = await fetch("/api/blocked-customers", { headers });
+      if (blockedRes.ok) {
+        const blockedData = await blockedRes.json();
+        setBlockedCustomers(blockedData);
+      }
+
+      const emailLogsRes = await fetch("/api/email-logs", { headers });
+      if (emailLogsRes.ok) {
+        const emailLogsData = await emailLogsRes.json();
+        setEmailLogs(emailLogsData);
+      }
     } catch (err) {
       console.error("Error fetching developer data:", err);
     } finally {
       setLoadingLogs(false);
       setLoadingManagers(false);
+    }
+  };
+
+  const handleBlockCustomer = async (email: string) => {
+    if (!window.confirm(currentLang === "ar" ? "هل أنت متأكد من حظر هذا العميل نهائياً ومنع تسجيله مجدداً بمعلومات مشابهة؟" : "Are you sure you want to ban this customer permanently?")) {
+      return;
+    }
+    setMessage(null);
+    try {
+      const res = await fetch("/api/block-customer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": currentUser.email,
+          "x-user-role": currentUser.role
+        },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to block customer");
+      setCustomers(data.registeredCustomers || []);
+      setBlockedCustomers(data.blockedCustomers || []);
+      setMessage({
+        text: currentLang === "ar" ? "تم حظر هذا العميل نهائياً ومنع تسجيله مستقبلاً بنجاح!" : "Customer blocked and banned permanently!",
+        type: "success"
+      });
+    } catch (err: any) {
+      setMessage({ text: err.message, type: "error" });
+    }
+  };
+
+  const handleUnblockCustomer = async (email: string) => {
+    setMessage(null);
+    try {
+      const res = await fetch("/api/unblock-customer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": currentUser.email,
+          "x-user-role": currentUser.role
+        },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to unblock customer");
+      setCustomers(data.registeredCustomers || []);
+      setBlockedCustomers(data.blockedCustomers || []);
+      setMessage({
+        text: currentLang === "ar" ? "تم إلغاء حظر العميل وإعادته للمسجلين بنجاح." : "Customer unblocked successfully.",
+        type: "success"
+      });
+    } catch (err: any) {
+      setMessage({ text: err.message, type: "error" });
     }
   };
 
@@ -546,10 +640,30 @@ export default function DeveloperConsole({
                 {/* Visual Tab Buttons */}
                 <div className="flex gap-2.5 mt-3 border-b border-stone-800/20 pb-1 flex-wrap">
                   <button
+                    onClick={() => setActiveConsoleTab("customers")}
+                    className={`pb-1 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                      activeConsoleTab === "customers" 
+                        ? "border-amber-400 text-amber-400 font-black" 
+                        : "border-transparent text-stone-400 hover:text-stone-300"
+                    }`}
+                  >
+                    {currentLang === "ar" ? "👥 الزبائن المسجلون" : "👥 Registered Customers"}
+                  </button>
+                  <button
+                    onClick={() => setActiveConsoleTab("emaillogs")}
+                    className={`pb-1 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                      activeConsoleTab === "emaillogs" 
+                        ? "border-sky-400 text-sky-400 font-black" 
+                        : "border-transparent text-stone-400 hover:text-stone-300"
+                    }`}
+                  >
+                    {currentLang === "ar" ? "📬 البريد التلقائي" : "📬 Auto Newsletter Logs"}
+                  </button>
+                  <button
                     onClick={() => setActiveConsoleTab("logs")}
                     className={`pb-1 text-xs font-bold border-b-2 transition-all cursor-pointer ${
                       activeConsoleTab === "logs" 
-                        ? "border-amber-400 text-amber-400" 
+                        ? "border-orange-400 text-orange-400" 
                         : "border-transparent text-stone-400 hover:text-stone-300"
                     }`}
                   >
@@ -588,6 +702,207 @@ export default function DeveloperConsole({
                 </button>
               )}
             </div>
+
+            {/* TAB CONTENT: REGISTERED CUSTOMERS (REQUIRED BY USER) */}
+            {activeConsoleTab === "customers" && (
+              <div className="p-4 space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-stone-850">
+                  <div className="text-xs text-amber-400 font-bold">
+                    {currentLang === "ar" ? `إجمالي الزبائن المسجلين: ${customers.length}` : `Total Registered Customers: ${customers.length}`}
+                  </div>
+                  <button
+                    onClick={fetchData}
+                    className="p-1 text-stone-400 hover:text-[#FDFBF7] rounded transition-all flex items-center gap-1 text-[11px]"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin-hover" />
+                    <span>{currentLang === "ar" ? "تحديث" : "Refresh"}</span>
+                  </button>
+                </div>
+
+                {customers.length === 0 ? (
+                  <div className="text-center py-16 text-stone-600 text-xs italic">
+                    {currentLang === "ar" ? "لا يوجد زبائن مسجلون في الموقع حتى الآن." : "No registered customers in database yet."}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs text-stone-300">
+                      <thead className="text-[10px] uppercase bg-stone-950 text-stone-400 font-mono tracking-wider border-b border-stone-850">
+                        <tr>
+                          <th className="px-3 py-2 text-center">{currentLang === "ar" ? "الصورة" : "Avatar"}</th>
+                          <th className="px-3 py-2">{currentLang === "ar" ? "الاسم الثلاثي" : "Triple Name"}</th>
+                          <th className="px-3 py-2">{currentLang === "ar" ? "الجيميل" : "Gmail"}</th>
+                          <th className="px-3 py-2">{currentLang === "ar" ? "الهواتف (أساسي / احتياطي)" : "Phones (Primary / Alt)"}</th>
+                          <th className="px-3 py-2">{currentLang === "ar" ? "تاريخ التسجيل" : "Registered At"}</th>
+                          <th className="px-3 py-2 text-center">{currentLang === "ar" ? "التحكم بالبصمة" : "Security Block"}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-850">
+                        {customers.map((c, idx) => (
+                          <tr key={idx} className="hover:bg-stone-850 transition-colors">
+                            <td className="px-3 py-3 text-center">
+                              <img
+                                src={c.picture}
+                                alt="Face Profile"
+                                className="w-10 h-10 rounded-full border border-amber-400 object-cover mx-auto shadow"
+                                referrerPolicy="no-referrer"
+                              />
+                              <span className="block text-[8px] text-emerald-400 mt-1">✓ ملامح معتمدة</span>
+                            </td>
+                            <td className="px-3 py-3 font-bold text-stone-200">
+                              <div className="flex flex-col">
+                                <span>{c.firstName} {c.secondName} {c.thirdName}</span>
+                                <span className="text-[9px] text-stone-500 uppercase font-mono mt-0.5">Classic Account</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-3 font-mono text-stone-300 select-all">
+                              {c.email}
+                            </td>
+                            <td className="px-3 py-3 font-mono text-stone-300">
+                              <div className="flex flex-col">
+                                <span className="text-amber-400">📱 {c.phone}</span>
+                                <span className="text-stone-400 text-[10px]">☎️ {c.alternativePhone || "-"}</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-3 text-[10px] text-stone-500">
+                              {new Date(c.registeredAt).toLocaleString(currentLang === "ar" ? "ar-EG" : "en-US")}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              <button
+                                onClick={() => handleBlockCustomer(c.email)}
+                                className="px-2.5 py-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 rounded-xl text-[10px] font-bold transition-all border border-red-900/40 flex items-center gap-1 mx-auto cursor-pointer"
+                                title={currentLang === "ar" ? "حظر وحظر البصمة/الاسم/الهاتف" : "Ban user permanently"}
+                              >
+                                <ShieldAlert className="w-3.5 h-3.5" />
+                                <span>{currentLang === "ar" ? "حظر نهائي ✕" : "Ban User ✕"}</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Blocked/Banned Customers Section */}
+                <div className="pt-6 border-t border-stone-800">
+                  <div className="text-xs text-red-400 font-bold mb-3 flex items-center gap-1">
+                    <span>{currentLang === "ar" ? "🚫 الحسابات المحظورة نهائياً (بصمة الوجه والبيانات)" : "🚫 Permanently Banned Accounts (Face ID & Metadata)"}</span>
+                    <span className="bg-red-950 text-red-400 px-2 py-0.5 rounded-full text-[9px] font-mono">{blockedCustomers.length}</span>
+                  </div>
+
+                  {blockedCustomers.length === 0 ? (
+                    <div className="text-center py-6 text-stone-600 text-xs italic bg-stone-900/40 border border-stone-800 rounded-2xl">
+                      {currentLang === "ar" ? "لا يوجد حسابات محظورة حالياً." : "No accounts are currently banned."}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto bg-stone-950/30 border border-stone-850 rounded-2xl p-2">
+                      <table className="w-full text-left text-xs text-stone-300">
+                        <thead className="text-[10px] uppercase bg-stone-950 text-stone-500 font-mono tracking-wider border-b border-stone-850">
+                          <tr>
+                            <th className="px-3 py-2 text-center">{currentLang === "ar" ? "الصورة" : "Avatar"}</th>
+                            <th className="px-3 py-2">{currentLang === "ar" ? "الاسم" : "Name"}</th>
+                            <th className="px-3 py-2">{currentLang === "ar" ? "الجيميل" : "Gmail"}</th>
+                            <th className="px-3 py-2">{currentLang === "ar" ? "الهواتف" : "Phones"}</th>
+                            <th className="px-3 py-2 text-center">{currentLang === "ar" ? "التحكم" : "Action"}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-850">
+                          {blockedCustomers.map((b, idx) => (
+                            <tr key={idx} className="hover:bg-red-950/10 transition-colors">
+                              <td className="px-3 py-2 text-center">
+                                <img
+                                  src={b.picture}
+                                  alt="Banned Profile"
+                                  className="w-8 h-8 rounded-full border border-red-500/50 object-cover mx-auto opacity-60"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <span className="block text-[8px] text-red-400 mt-0.5">محظور ✕</span>
+                              </td>
+                              <td className="px-3 py-2 font-bold text-stone-400 line-through">
+                                {b.firstName} {b.secondName} {b.thirdName}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-stone-500 select-all">
+                                {b.email}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-stone-500">
+                                <div>📱 {b.phone}</div>
+                                <div className="text-[10px]">☎️ {b.alternativePhone || "-"}</div>
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <button
+                                  onClick={() => handleUnblockCustomer(b.email)}
+                                  className="px-2 py-1 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 hover:text-emerald-300 rounded-lg text-[10px] font-bold transition-all border border-emerald-900/40 flex items-center gap-1 mx-auto cursor-pointer"
+                                >
+                                  <ShieldCheck className="w-3 h-3" />
+                                  <span>{currentLang === "ar" ? "إلغاء الحظر" : "Unban"}</span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: AUTOMATED GMAIL LOGS */}
+            {activeConsoleTab === "emaillogs" && (
+              <div className="p-4 space-y-4">
+                <div className="bg-emerald-950/20 border border-emerald-900/30 p-3 rounded-2xl">
+                  <p className="text-[11px] text-emerald-400">
+                    {currentLang === "ar" 
+                      ? "📌 يتم تفعيل الإرسال التلقائي والإجباري لجميع العروض والمنتجات الجديدة تلقائياً إلى بريد الجيميل الخاص بالعميل فور تسجيله بنجاح!" 
+                      : "📌 Automated dispatch fires instantly, broadcasting all current promos & newly added dishes straight to each client's Gmail address."}
+                  </p>
+                </div>
+
+                <div className="flex justify-between items-center pb-2 border-b border-stone-850">
+                  <div className="text-xs text-sky-400 font-bold">
+                    {currentLang === "ar" ? `الرسائل المرسلة تلقائياً: ${emailLogs.length}` : `Simulated Sent Emails: ${emailLogs.length}`}
+                  </div>
+                  <button
+                    onClick={fetchData}
+                    className="p-1 text-stone-400 hover:text-[#FDFBF7] rounded transition-all flex items-center gap-1 text-[11px]"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin-hover" />
+                    <span>{currentLang === "ar" ? "تحديث" : "Refresh"}</span>
+                  </button>
+                </div>
+
+                {emailLogs.length === 0 ? (
+                  <div className="text-center py-16 text-stone-600 text-xs italic">
+                    {currentLang === "ar" ? "لا توجد رسائل مرسلة تلقائياً حتى الآن." : "No auto newsletters dispatched yet."}
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                    {emailLogs.map((log, idx) => (
+                      <div key={idx} className="bg-stone-950 border border-stone-850 p-3 rounded-xl space-y-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] text-stone-500">{currentLang === "ar" ? "إلى البريد:" : "To Email:"}</span>
+                            <span className="ml-1 text-xs font-mono font-bold text-amber-400 select-all">{log.toEmail}</span>
+                          </div>
+                          <span className="px-2 py-0.5 bg-emerald-900/40 text-emerald-400 text-[8px] font-bold rounded-full font-mono">
+                            {log.status}
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-stone-200">
+                          📢 {log.subject}
+                        </div>
+                        <div className="text-[11px] text-stone-400 whitespace-pre-wrap bg-stone-900 p-2.5 rounded-lg font-mono border border-stone-800">
+                          {log.body}
+                        </div>
+                        <div className="text-[9px] text-stone-500 text-right">
+                          {new Date(log.sentAt).toLocaleString(currentLang === "ar" ? "ar-EG" : "en-US")}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* TAB CONTENT: LIVE SESSIONS */}
             {activeConsoleTab === "logs" && (

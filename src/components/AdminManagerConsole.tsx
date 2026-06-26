@@ -23,6 +23,7 @@ interface AdminManagerConsoleProps {
   onRemoveManager: (email: string) => void;
   onSaveProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
+  onDeleteAllProducts?: () => void;
   onSaveExclusiveOffer: (offer: ExclusiveOffer) => void;
   onSaveWeeklyOffers: (offers: WeeklyOffer[]) => void;
   onLogout: () => void;
@@ -31,6 +32,7 @@ interface AdminManagerConsoleProps {
   categories: CategoryItem[];
   onAddCategory: (id: string, name: any, icon?: string) => Promise<{ success: boolean; error?: string }>;
   onDeleteCategory: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onUpdateCategory: (id: string, name: any, icon?: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export default function AdminManagerConsole({
@@ -48,6 +50,7 @@ export default function AdminManagerConsole({
   onRemoveManager,
   onSaveProduct,
   onDeleteProduct,
+  onDeleteAllProducts,
   onSaveExclusiveOffer,
   onSaveWeeklyOffers,
   onLogout,
@@ -55,7 +58,8 @@ export default function AdminManagerConsole({
   setEditingProduct,
   categories = [],
   onAddCategory,
-  onDeleteCategory
+  onDeleteCategory,
+  onUpdateCategory
 }: AdminManagerConsoleProps) {
   const t = TRANSLATIONS[currentLang];
   
@@ -74,12 +78,13 @@ export default function AdminManagerConsole({
   const [newCatNameIt, setNewCatNameIt] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('utensils');
   const [catMessage, setCatMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
 
   // Product form state (when editing or adding)
   const [isAddingNewProduct, setIsAddingNewProduct] = useState(false);
   const [pId, setPId] = useState('');
   const [pCategory, setPCategory] = useState<string>('sandwiches');
-  const [pPrice, setPPrice] = useState(100);
+  const [pPrice, setPPrice] = useState<number | "">(100);
   const [pImage, setPImage] = useState('');
   
   // Multilingual product strings
@@ -122,6 +127,14 @@ export default function AdminManagerConsole({
   const [weeklyDescFr, setWeeklyDescFr] = useState('');
   const [weeklyDescIt, setWeeklyDescIt] = useState('');
   const [weeklyDiscount, setWeeklyDiscount] = useState('');
+
+  // Confirmation state for deleting products (iframe-safe)
+  const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+
+  // Dynamic automatic translation states
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState('');
 
   // Trigger editing a product
   const startEditProduct = (p: Product) => {
@@ -171,39 +184,188 @@ export default function AdminManagerConsole({
     setPDescIt('');
   };
 
-  const saveProductSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pNameEn || !pNameAr || !pNameFr || !pNameIt) {
-      alert("Please fill in names in all 4 languages.");
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAutoTranslate = async () => {
+    const availableName = pNameAr || pNameEn || pNameFr || pNameIt;
+    const availableDesc = pDescAr || pDescEn || pDescFr || pDescIt;
+
+    if (!availableName) {
+      setTranslationError(currentLang === 'ar' ? 'الرجاء إدخال اسم المنتج بلغة واحدة على الأقل للترجمة التلقائية.' : 'Please enter the product name in at least one language first to translate.');
       return;
     }
+
+    setIsTranslating(true);
+    setTranslationError('');
+
+    try {
+      const langs: ('ar' | 'en' | 'fr' | 'it')[] = ['ar', 'en', 'fr', 'it'];
+
+      const translateText = async (text: string, targetLang: string): Promise<string> => {
+        const response = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, targetLang })
+        });
+        if (!response.ok) throw new Error('Translation failed');
+        const data = await response.json();
+        return data.translation;
+      };
+
+      // Translate Names
+      const nameTranslations = await Promise.all(
+        langs.map(async (lang) => {
+          const currentVal = { ar: pNameAr, en: pNameEn, fr: pNameFr, it: pNameIt }[lang];
+          if (currentVal) return { lang, val: currentVal };
+          const trans = await translateText(availableName, lang);
+          return { lang, val: trans };
+        })
+      );
+
+      // Translate Descriptions
+      let descTranslations = [];
+      if (availableDesc) {
+        descTranslations = await Promise.all(
+          langs.map(async (lang) => {
+            const currentVal = { ar: pDescAr, en: pDescEn, fr: pDescFr, it: pDescIt }[lang];
+            if (currentVal) return { lang, val: currentVal };
+            const trans = await translateText(availableDesc, lang);
+            return { lang, val: trans };
+          })
+        );
+      }
+
+      nameTranslations.forEach((item) => {
+        if (item.lang === 'ar') setPNameAr(item.val);
+        if (item.lang === 'en') setPNameEn(item.val);
+        if (item.lang === 'fr') setPNameFr(item.val);
+        if (item.lang === 'it') setPNameIt(item.val);
+      });
+
+      if (availableDesc) {
+        descTranslations.forEach((item) => {
+          if (item.lang === 'ar') setPDescAr(item.val);
+          if (item.lang === 'en') setPDescEn(item.val);
+          if (item.lang === 'fr') setPDescFr(item.val);
+          if (item.lang === 'it') setPDescIt(item.val);
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setTranslationError(currentLang === 'ar' ? 'حدث خطأ أثناء الترجمة التلقائية. يرجى ملء الحقول يدوياً.' : 'Error during translation. Please fill fields manually.');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const saveProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const availableName = pNameAr || pNameEn || pNameFr || pNameIt;
+    if (!availableName) {
+      alert(currentLang === 'ar' ? "يرجى كتابة اسم المنتج بلغة واحدة على الأقل." : "Please fill in the product name in at least one language.");
+      return;
+    }
+
+    if (pPrice === "" || Number(pPrice) <= 0) {
+      alert(currentLang === 'ar' ? "يرجى إدخال سعر صحيح أكبر من الصفر." : "Please enter a valid price greater than zero.");
+      return;
+    }
+
+    setIsTranslating(true);
+    setTranslationError('');
+
+    let finalNameAr = pNameAr;
+    let finalNameEn = pNameEn;
+    let finalNameFr = pNameFr;
+    let finalNameIt = pNameIt;
+
+    let finalDescAr = pDescAr;
+    let finalDescEn = pDescEn;
+    let finalDescFr = pDescFr;
+    let finalDescIt = pDescIt;
+
+    const availableDesc = pDescAr || pDescEn || pDescFr || pDescIt;
+
+    try {
+      const translateText = async (text: string, targetLang: string): Promise<string> => {
+        const response = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, targetLang })
+        });
+        if (!response.ok) throw new Error('Translation failed');
+        const data = await response.json();
+        return data.translation;
+      };
+
+      if (!pNameAr) finalNameAr = await translateText(availableName, 'ar');
+      if (!pNameEn) finalNameEn = await translateText(availableName, 'en');
+      if (!pNameFr) finalNameFr = await translateText(availableName, 'fr');
+      if (!pNameIt) finalNameIt = await translateText(availableName, 'it');
+
+      if (availableDesc) {
+        if (!pDescAr) finalDescAr = await translateText(availableDesc, 'ar');
+        if (!pDescEn) finalDescEn = await translateText(availableDesc, 'en');
+        if (!pDescFr) finalDescFr = await translateText(availableDesc, 'fr');
+        if (!pDescIt) finalDescIt = await translateText(availableDesc, 'it');
+      } else {
+        finalDescAr = '';
+        finalDescEn = '';
+        finalDescFr = '';
+        finalDescIt = '';
+      }
+    } catch (err) {
+      console.error("Auto translate during save failed", err);
+      finalNameAr = finalNameAr || availableName;
+      finalNameEn = finalNameEn || availableName;
+      finalNameFr = finalNameFr || availableName;
+      finalNameIt = finalNameIt || availableName;
+
+      finalDescAr = finalDescAr || availableDesc || '';
+      finalDescEn = finalDescEn || availableDesc || '';
+      finalDescFr = finalDescFr || availableDesc || '';
+      finalDescIt = finalDescIt || availableDesc || '';
+    } finally {
+      setIsTranslating(false);
+    }
+
     const newProduct: Product = {
       id: pId,
       category: pCategory,
       price: Number(pPrice),
       image: pImage || 'https://picsum.photos/seed/restaurant/600/600',
       name: {
-        ar: pNameAr,
-        en: pNameEn,
-        fr: pNameFr,
-        it: pNameIt
+        ar: finalNameAr,
+        en: finalNameEn,
+        fr: finalNameFr,
+        it: finalNameIt
       },
       description: {
-        ar: pDescAr,
-        en: pDescEn,
-        fr: pDescFr,
-        it: pDescIt
+        ar: finalDescAr,
+        en: finalDescEn,
+        fr: finalDescFr,
+        it: finalDescIt
       }
     };
+
     onSaveProduct(newProduct);
     setIsAddingNewProduct(false);
     setEditingProduct(null);
   };
 
-  const handleCreateCategorySubmit = async (e: React.FormEvent) => {
+  const handleSaveCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCatMessage(null);
-    if (!newCatId || !newCatNameAr || !newCatNameEn || !newCatNameFr || !newCatNameIt) {
+    if (!newCatNameAr || !newCatNameEn || !newCatNameFr || !newCatNameIt) {
       setCatMessage({
         text: currentLang === 'ar' ? 'الرجاء ملء جميع أسماء القسم بأربع لغات.' : 'Please fill all localized names.',
         type: 'error'
@@ -211,35 +373,96 @@ export default function AdminManagerConsole({
       return;
     }
 
-    const formattedId = newCatId.trim().toLowerCase().replace(/\s+/g, '_');
-    const res = await onAddCategory(
-      formattedId,
-      {
-        ar: newCatNameAr,
-        en: newCatNameEn,
-        fr: newCatNameFr,
-        it: newCatNameIt
-      },
-      newCatIcon
-    );
+    if (editingCatId) {
+      const res = await onUpdateCategory(
+        editingCatId,
+        {
+          ar: newCatNameAr,
+          en: newCatNameEn,
+          fr: newCatNameFr,
+          it: newCatNameIt
+        },
+        newCatIcon
+      );
 
-    if (res.success) {
-      setNewCatId('');
-      setNewCatNameAr('');
-      setNewCatNameEn('');
-      setNewCatNameFr('');
-      setNewCatNameIt('');
-      setNewCatIcon('utensils');
-      setCatMessage({
-        text: currentLang === 'ar' ? 'تم إضافة القسم بنجاح!' : 'Section added successfully!',
-        type: 'success'
-      });
+      if (res.success) {
+        setEditingCatId(null);
+        setNewCatId('');
+        setNewCatNameAr('');
+        setNewCatNameEn('');
+        setNewCatNameFr('');
+        setNewCatNameIt('');
+        setNewCatIcon('utensils');
+        setCatMessage({
+          text: currentLang === 'ar' ? 'تم تعديل القسم بنجاح!' : 'Section updated successfully!',
+          type: 'success'
+        });
+      } else {
+        setCatMessage({
+          text: res.error || (currentLang === 'ar' ? 'حدث خطأ ما.' : 'An error occurred.'),
+          type: 'error'
+        });
+      }
     } else {
-      setCatMessage({
-        text: res.error || (currentLang === 'ar' ? 'حدث خطأ ما.' : 'An error occurred.'),
-        type: 'error'
-      });
+      if (!newCatId) {
+        setCatMessage({
+          text: currentLang === 'ar' ? 'الرجاء إدخال كود القسم.' : 'Please enter Section ID.',
+          type: 'error'
+        });
+        return;
+      }
+      const formattedId = newCatId.trim().toLowerCase().replace(/\s+/g, '_');
+      const res = await onAddCategory(
+        formattedId,
+        {
+          ar: newCatNameAr,
+          en: newCatNameEn,
+          fr: newCatNameFr,
+          it: newCatNameIt
+        },
+        newCatIcon
+      );
+
+      if (res.success) {
+        setNewCatId('');
+        setNewCatNameAr('');
+        setNewCatNameEn('');
+        setNewCatNameFr('');
+        setNewCatNameIt('');
+        setNewCatIcon('utensils');
+        setCatMessage({
+          text: currentLang === 'ar' ? 'تم إضافة القسم بنجاح!' : 'Section added successfully!',
+          type: 'success'
+        });
+      } else {
+        setCatMessage({
+          text: res.error || (currentLang === 'ar' ? 'حدث خطأ ما.' : 'An error occurred.'),
+          type: 'error'
+        });
+      }
     }
+  };
+
+  const startEditCategory = (cat: CategoryItem) => {
+    setEditingCatId(cat.id);
+    setNewCatId(cat.id);
+    setNewCatNameAr(cat.name.ar || '');
+    setNewCatNameEn(cat.name.en || '');
+    setNewCatNameFr(cat.name.fr || '');
+    setNewCatNameIt(cat.name.it || '');
+    setNewCatIcon(cat.icon || 'utensils');
+    setCatMessage(null);
+  };
+
+  const cancelEditCategory = () => {
+    setEditingCatId(null);
+    setNewCatId('');
+    setNewCatNameAr('');
+    setNewCatNameEn('');
+    setNewCatNameFr('');
+    setNewCatNameIt('');
+    setNewCatIcon('utensils');
+    setCatMessage(null);
   };
 
   const handleRemoveCategoryClick = async (id: string) => {
@@ -404,13 +627,26 @@ export default function AdminManagerConsole({
                   <h3 className="font-bold text-sm text-brand-blue uppercase tracking-wider font-mono">
                     {currentLang === 'ar' ? 'قائمة المنتجات الحالية' : 'Current Database Products'} ({products.length})
                   </h3>
-                  <button
-                    onClick={startAddProduct}
-                    className="px-4 py-2 bg-brand-blue text-brand-cream hover:bg-brand-blue/90 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <PlusCircle className="w-4 h-4 text-brand-gold" />
-                    {t.addProduct}
-                  </button>
+                  <div className="flex gap-2">
+                    {products.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteAllConfirm(true)}
+                        className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-brand-red text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                        title={currentLang === 'ar' ? 'مسح جميع المنتجات' : 'Delete All Products'}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>{currentLang === 'ar' ? 'مسح الكل' : 'Delete All'}</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={startAddProduct}
+                      className="px-4 py-2 bg-brand-blue text-brand-cream hover:bg-brand-blue/90 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-all"
+                    >
+                      <PlusCircle className="w-4 h-4 text-brand-gold" />
+                      {t.addProduct}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Simple Table listing all products with edit/delete triggers */}
@@ -455,8 +691,8 @@ export default function AdminManagerConsole({
                                 <Edit className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => onDeleteProduct(p.id)}
-                                className="p-1.5 hover:bg-brand-red/10 text-brand-red rounded"
+                                onClick={() => setProductToDeleteId(p.id)}
+                                className="p-1.5 hover:bg-brand-red/10 text-brand-red rounded cursor-pointer"
                                 title="Delete"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -498,8 +734,8 @@ export default function AdminManagerConsole({
                   </div>
                 )}
 
-                {/* Categories Creation Form */}
-                <form onSubmit={handleCreateCategorySubmit} className="space-y-4">
+                {/* Categories Creation/Edition Form */}
+                <form onSubmit={handleSaveCategorySubmit} className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-extrabold uppercase tracking-wider text-brand-blue mb-1.5">
                       {currentLang === 'ar' ? 'معرّف القسم فريد (إنجليزي)' : 'Unique Section ID (lowercase, e.g. beverages)'}
@@ -507,11 +743,21 @@ export default function AdminManagerConsole({
                     <input
                       type="text"
                       required
+                      disabled={!!editingCatId}
                       value={newCatId}
                       onChange={(e) => setNewCatId(e.target.value)}
                       placeholder="e.g. pastries, beverages"
-                      className="w-full text-xs p-3 border border-gray-200 rounded-2xl bg-slate-50 focus:bg-white focus:outline-brand-blue font-mono"
+                      className={`w-full text-xs p-3 border border-gray-200 rounded-2xl focus:bg-white focus:outline-brand-blue font-mono ${
+                        editingCatId ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-slate-50'
+                      }`}
                     />
+                    {editingCatId && (
+                      <span className="block text-[9px] text-gray-400 mt-1">
+                        {currentLang === 'ar' 
+                          ? 'لا يمكن تغيير معرّف القسم لتفادي كسر روابط المنتجات الحالية.' 
+                          : 'Section ID cannot be changed to prevent breaking existing product relationships.'}
+                      </span>
+                    )}
                   </div>
 
                   {/* Multi-language Localized Names */}
@@ -586,13 +832,32 @@ export default function AdminManagerConsole({
                     </select>
                   </div>
 
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-brand-blue hover:bg-brand-blue/90 text-brand-cream text-xs font-bold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 transform hover:-translate-y-0.5"
-                  >
-                    <PlusCircle className="w-4 h-4 text-brand-gold" />
-                    <span>{currentLang === 'ar' ? 'إضافة قسم جديد' : 'Create New Section'}</span>
-                  </button>
+                  {editingCatId ? (
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={cancelEditCategory}
+                        className="flex-1 py-3 border border-gray-200 hover:bg-slate-50 text-gray-500 text-xs font-bold rounded-2xl transition-all text-center cursor-pointer"
+                      >
+                        {t.cancel}
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 py-3 bg-brand-gold hover:bg-brand-gold/90 text-brand-blue text-xs font-bold rounded-2xl shadow-md transition-all flex items-center justify-center gap-1.5 transform hover:-translate-y-0.5"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>{currentLang === 'ar' ? 'حفظ التعديلات' : 'Save Changes'}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="submit"
+                      className="w-full py-3 bg-brand-blue hover:bg-brand-blue/90 text-brand-cream text-xs font-bold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 transform hover:-translate-y-0.5"
+                    >
+                      <PlusCircle className="w-4 h-4 text-brand-gold" />
+                      <span>{currentLang === 'ar' ? 'إضافة قسم جديد' : 'Create New Section'}</span>
+                    </button>
+                  )}
                 </form>
 
                 {/* Section listings */}
@@ -617,14 +882,26 @@ export default function AdminManagerConsole({
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCategoryClick(cat.id)}
-                          className="p-1.5 text-gray-400 hover:text-brand-red hover:bg-rose-50 rounded-xl transition-colors"
-                          title="Remove Section"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => startEditCategory(cat)}
+                            className="px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-xl text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                            title={currentLang === 'ar' ? 'تعديل اسم القسم' : 'Edit Section Name'}
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>{currentLang === 'ar' ? 'تعديل' : 'Edit'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCategoryClick(cat.id)}
+                            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-brand-red rounded-xl text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                            title="Remove Section"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>{currentLang === 'ar' ? 'حذف' : 'Delete'}</span>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -649,94 +926,182 @@ export default function AdminManagerConsole({
                 </button>
               </div>
 
+              {/* Dynamic Translation Banner / Loading state */}
+              {isTranslating && (
+                <div className="bg-amber-500/10 text-amber-700 p-4 rounded-2xl border border-amber-500/20 text-xs font-bold flex items-center gap-3 animate-pulse">
+                  <span className="text-sm">✨</span>
+                  <span>
+                    {currentLang === 'ar' 
+                      ? 'جاري الترجمة التلقائية للحقول الفارغة بالذكاء الاصطناعي (Gemini)... يرجى الانتظار.' 
+                      : 'Auto-translating blank language fields using Gemini AI... please wait.'}
+                  </span>
+                </div>
+              )}
+
+              {translationError && (
+                <div className="bg-red-50 text-red-600 p-4 rounded-2xl border border-red-200 text-xs font-bold">
+                  ⚠️ {translationError}
+                </div>
+              )}
+
               {/* Price, Category, Image fields */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-brand-blue mb-1.5">{t.category}</label>
-                  <select
-                    value={pCategory}
-                    onChange={(e) => setPCategory(e.target.value)}
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                  >
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name[currentLang] || cat.id}
-                      </option>
-                    ))}
-                  </select>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Category and Price */}
+                <div className="lg:col-span-4 space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-brand-blue mb-1.5">{t.category}</label>
+                    <select
+                      value={pCategory}
+                      onChange={(e) => setPCategory(e.target.value)}
+                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
+                    >
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name[currentLang] || cat.id}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-brand-blue mb-1.5">{t.price} ({t.currency})</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={pPrice === 0 ? "" : pPrice}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "" || val === "0") {
+                          setPPrice("");
+                        } else {
+                          const parsed = parseInt(val, 10);
+                          if (!isNaN(parsed)) {
+                            setPPrice(parsed);
+                          }
+                        }
+                      }}
+                      placeholder={currentLang === 'ar' ? 'أدخل السعر هنا' : 'Enter price'}
+                      required
+                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue font-mono"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-brand-blue mb-1.5">{t.price} ({t.currency})</label>
-                  <input
-                    type="number"
-                    value={pPrice}
-                    onChange={(e) => setPPrice(Number(e.target.value))}
-                    required
-                    min="1"
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-brand-blue mb-1.5">{t.imageUrl}</label>
-                  <input
-                    type="url"
-                    value={pImage}
-                    onChange={(e) => setPImage(e.target.value)}
-                    required
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                  />
+                {/* Device Image Uploader */}
+                <div className="lg:col-span-8">
+                  <label className="block text-xs font-bold text-brand-blue mb-1.5">
+                    {currentLang === 'ar' ? 'صورة المنتج' : 'Product Image'}
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center bg-white p-4 rounded-2xl border border-gray-100">
+                    <div className="sm:col-span-4 h-28 relative bg-slate-50 border border-dashed border-gray-200 rounded-xl overflow-hidden flex items-center justify-center">
+                      {pImage ? (
+                        <>
+                          <img src={pImage} alt="Preview" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setPImage('')}
+                            className="absolute top-2 right-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs shadow-md transition-all cursor-pointer border-none"
+                            title="Remove image"
+                          >
+                            ✕
+                          </button>
+                        </>
+                      ) : (
+                        <div className="text-center p-3">
+                          <span className="block text-xl text-gray-300">📸</span>
+                          <span className="block text-[9px] text-gray-400 mt-0.5">
+                            {currentLang === 'ar' ? 'لا توجد صورة' : 'No image'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="sm:col-span-8 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="flex-1 py-2.5 px-4 bg-brand-blue hover:bg-brand-blue/95 text-brand-cream text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 cursor-pointer border border-brand-blue text-center">
+                          <span>{currentLang === 'ar' ? '📤 ارفع صورة من الهاتف / الجهاز' : '📤 Upload Image from Phone/Device'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageFileChange}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                      <div className="text-[10px] text-gray-400 leading-relaxed">
+                        {currentLang === 'ar' 
+                          ? 'اختر صورة من جهازك ليتم حفظها مباشرة، أو يمكنك لصق رابط خارجي للصورة أدناه.'
+                          : 'Choose an image from your device to save directly, or paste an external image link below.'}
+                      </div>
+                      <input
+                        type="url"
+                        placeholder={currentLang === 'ar' ? 'رابط الصورة البديل (اختياري)' : 'Alternative Image URL (Optional)'}
+                        value={pImage.startsWith('data:') ? '' : pImage}
+                        onChange={(e) => setPImage(e.target.value)}
+                        className="w-full text-[10px] p-2 border border-gray-100 rounded-lg bg-slate-50 focus:outline-brand-blue"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Product Names (4 Languages) */}
               <div className="space-y-3">
-                <h4 className="text-xs font-extrabold text-brand-blue tracking-wider uppercase border-b border-gray-100 pb-1">
-                  Product Name in All 4 Languages
-                </h4>
+                <div className="flex justify-between items-center border-b border-gray-100 pb-1">
+                  <h4 className="text-xs font-extrabold text-brand-blue tracking-wider uppercase">
+                    {currentLang === 'ar' ? 'اسم المنتج بجميع اللغات (يكفي ملء لغة واحدة والضغط على ترجمة)' : 'Product Name (Fill at least one language)'}
+                  </h4>
+                  
+                  <button
+                    type="button"
+                    disabled={isTranslating}
+                    onClick={handleAutoTranslate}
+                    className="py-1 px-3 bg-brand-gold/20 hover:bg-brand-gold/30 disabled:bg-gray-100 text-brand-blue hover:text-brand-blue/90 text-[10px] font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>✨</span>
+                    <span>{currentLang === 'ar' ? 'ترجمة تلقائية بالذكاء الاصطناعي' : '✨ Gemini Auto-Translate Blank Fields'}</span>
+                  </button>
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-red mb-1">ARABIC (العربية) *</label>
+                    <label className="block text-[10px] font-bold text-brand-red mb-1">ARABIC (العربية)</label>
                     <input
                       type="text"
                       value={pNameAr}
                       onChange={(e) => setPNameAr(e.target.value)}
-                      required
                       placeholder="مثال: لازانيا دجاج بالكريمة"
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue text-right"
                       dir="rtl"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ENGLISH *</label>
+                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ENGLISH</label>
                     <input
                       type="text"
                       value={pNameEn}
                       onChange={(e) => setPNameEn(e.target.value)}
-                      required
                       placeholder="e.g. Creamy Chicken Lasagna"
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">FRENCH (Français) *</label>
+                    <label className="block text-[10px] font-bold text-brand-blue mb-1">FRENCH (Français)</label>
                     <input
                       type="text"
                       value={pNameFr}
                       onChange={(e) => setPNameFr(e.target.value)}
-                      required
                       placeholder="ex: Lasagne de Poulet Crémeuse"
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ITALIAN (Italiano) *</label>
+                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ITALIAN (Italiano)</label>
                     <input
                       type="text"
                       value={pNameIt}
                       onChange={(e) => setPNameIt(e.target.value)}
-                      required
                       placeholder="es: Lasagna Cremosa al Pollo"
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
                     />
@@ -747,15 +1112,14 @@ export default function AdminManagerConsole({
               {/* Product Descriptions (4 Languages) */}
               <div className="space-y-3">
                 <h4 className="text-xs font-extrabold text-brand-blue tracking-wider uppercase border-b border-gray-100 pb-1">
-                  Descriptions & Ingredients in All 4 Languages
+                  {currentLang === 'ar' ? 'وصف المنتج ومكوناته بجميع اللغات' : 'Descriptions & Ingredients in All Languages'}
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-red mb-1">ARABIC Description *</label>
+                    <label className="block text-[10px] font-bold text-brand-red mb-1">ARABIC Description</label>
                     <textarea
                       value={pDescAr}
                       onChange={(e) => setPDescAr(e.target.value)}
-                      required
                       rows={3}
                       placeholder="مكونات الطبق والبهارات..."
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue text-right"
@@ -763,33 +1127,30 @@ export default function AdminManagerConsole({
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ENGLISH Description *</label>
+                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ENGLISH Description</label>
                     <textarea
                       value={pDescEn}
                       onChange={(e) => setPDescEn(e.target.value)}
-                      required
                       rows={3}
                       placeholder="Premium ingredients, sauce details..."
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">FRENCH Description *</label>
+                    <label className="block text-[10px] font-bold text-brand-blue mb-1">FRENCH Description</label>
                     <textarea
                       value={pDescFr}
                       onChange={(e) => setPDescFr(e.target.value)}
-                      required
                       rows={3}
                       placeholder="Ingrédients nobles, sauce..."
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ITALIAN Description *</label>
+                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ITALIAN Description</label>
                     <textarea
                       value={pDescIt}
                       onChange={(e) => setPDescIt(e.target.value)}
-                      required
                       rows={3}
                       placeholder="Ingredienti freschi, condimento..."
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
@@ -801,6 +1162,7 @@ export default function AdminManagerConsole({
               <div className="flex gap-2 justify-end pt-4 border-t border-gray-100">
                 <button
                   type="button"
+                  disabled={isTranslating}
                   onClick={() => { setIsAddingNewProduct(false); setEditingProduct(null); }}
                   className="px-5 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-500 font-bold rounded-xl text-xs transition-colors"
                 >
@@ -808,10 +1170,20 @@ export default function AdminManagerConsole({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-brand-gold text-brand-blue font-bold rounded-xl text-xs flex items-center gap-1 hover:bg-brand-gold/90 transition-all shadow-sm"
+                  disabled={isTranslating}
+                  className="px-6 py-2.5 bg-brand-gold disabled:bg-amber-300 text-brand-blue font-bold rounded-xl text-xs flex items-center gap-1.5 hover:bg-brand-gold/90 transition-all shadow-sm cursor-pointer"
                 >
-                  <Check className="w-4 h-4" />
-                  {t.save}
+                  {isTranslating ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
+                      <span>{currentLang === 'ar' ? 'جاري الترجمة والحفظ...' : 'Translating & Saving...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      {t.save}
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1316,6 +1688,86 @@ export default function AdminManagerConsole({
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM DELETE SINGLE PRODUCT MODAL (iframe-safe) */}
+      {productToDeleteId && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-100 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 bg-rose-50 text-brand-red rounded-full flex items-center justify-center mx-auto text-xl">
+                ⚠️
+              </div>
+              <h3 className="serif-heading text-base font-bold text-brand-blue">
+                {currentLang === 'ar' ? 'تأكيد حذف المنتج' : 'Confirm Product Deletion'}
+              </h3>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                {currentLang === 'ar'
+                  ? 'هل أنت متأكد من رغبتك في حذف هذا المنتج نهائياً؟'
+                  : 'Are you sure you want to permanently delete this product?'}
+              </p>
+            </div>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setProductToDeleteId(null)}
+                className="flex-1 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-500 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteProduct(productToDeleteId);
+                  setProductToDeleteId(null);
+                }}
+                className="flex-1 py-2.5 bg-brand-red hover:bg-brand-red/90 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                {currentLang === 'ar' ? 'حذف' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM DELETE ALL PRODUCTS MODAL (iframe-safe) */}
+      {showDeleteAllConfirm && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-100 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 bg-red-100 text-brand-red rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+                ⚠️
+              </div>
+              <h3 className="serif-heading text-base font-bold text-brand-red">
+                {currentLang === 'ar' ? 'مسح جميع المنتجات' : 'Delete All Products'}
+              </h3>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                {currentLang === 'ar'
+                  ? 'هل أنت متأكد من رغبتك في مسح جميع المنتجات بالكامل من قاعدة البيانات؟ لا يمكن التراجع عن هذا الإجراء.'
+                  : 'Are you sure you want to delete all products from the database? This action cannot be undone.'}
+              </p>
+            </div>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllConfirm(false)}
+                className="flex-1 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-500 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteAllProducts?.();
+                  setShowDeleteAllConfirm(false);
+                }}
+                className="flex-1 py-2.5 bg-brand-red hover:bg-brand-red/90 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                {currentLang === 'ar' ? 'مسح الكل' : 'Delete All'}
+              </button>
             </div>
           </div>
         </div>

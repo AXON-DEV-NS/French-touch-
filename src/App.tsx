@@ -186,6 +186,28 @@ export default function App() {
   const [adminActiveTab, setAdminActiveTab] = useState<'products' | 'offers' | 'super'>('products');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
+  // --- Customer Registration State ---
+  const [regFirstName, setRegFirstName] = useState('');
+  const [regSecondName, setRegSecondName] = useState('');
+  const [regThirdName, setRegThirdName] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regAltPhone, setRegAltPhone] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPicture, setRegPicture] = useState('');
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState('');
+  const [regSuccess, setRegSuccess] = useState(false);
+
+  // --- New Checkout Flow States ---
+  const [pendingCheckout, setPendingCheckout] = useState(false);
+  const [isCheckoutDetailsOpen, setIsCheckoutDetailsOpen] = useState(false);
+  const [checkoutBranch, setCheckoutBranch] = useState<'medical' | 'waha'>('medical');
+  const [checkoutDiningType, setCheckoutDiningType] = useState<'takeaway' | 'dinein'>('takeaway');
+  const [checkoutDate, setCheckoutDate] = useState('');
+  const [checkoutTime, setCheckoutTime] = useState('');
+  const [checkoutRulesAccepted, setCheckoutRulesAccepted] = useState(false);
+  const [currentOrderNumber, setCurrentOrderNumber] = useState<number | null>(null);
+
   // --- Secret Portal Logic ---
   const [logoClicks, setLogoClicks] = useState(0);
   const [lastLogoClick, setLastLogoClick] = useState(0);
@@ -327,12 +349,11 @@ export default function App() {
     };
   }, []);
 
-  // --- Auth Checks (Reactive to developer simulation) ---
+  // --- Auth Checks (Strict Isolation of Roles) ---
   const isDeveloper = currentUser?.role === 'Developer';
-  const activeRole = (isDeveloper ? previewRole : currentUser?.role) || 'Customer';
-
-  const isManager = activeRole === 'Manager' || activeRole === 'Developer' || currentUser?.email === 'oren.on.oren.25@gmail.com';
-  const isSuperAdmin = activeRole === 'Developer' || currentUser?.email === 'oren.on.oren.25@gmail.com';
+  const isManager = currentUser?.role === 'Manager';
+  const isSuperAdmin = currentUser?.role === 'Developer';
+  const activeRole = currentUser?.role || 'Customer';
 
   const handleLoginSuccess = (user: { email: string; name: string; picture?: string; role: 'Developer' | 'Manager' | 'Customer'; lang?: Language }) => {
     setCurrentUser(user);
@@ -346,8 +367,14 @@ export default function App() {
         safeStorage.setItem('frenchtouch_lang', user.lang);
       }
     } else {
-      setActiveAppTab('menu');
       setIsAdminConsoleVisible(false);
+      if (pendingCheckout) {
+        setActiveAppTab('menu');
+        setIsCartOpen(true);
+        setIsCheckoutDetailsOpen(true);
+      } else {
+        setActiveAppTab('menu');
+      }
     }
   };
 
@@ -415,10 +442,13 @@ export default function App() {
   };
 
   const handleDeleteProduct = (id: string) => {
-    if (confirm(currentLang === 'ar' ? "هل أنت متأكد من حذف هذا المنتج؟" : "Are you sure you want to delete this product?")) {
-      setProducts(products.filter(p => p.id !== id));
-      setCart(cart.filter(item => item.product.id !== id));
-    }
+    setProducts(products.filter(p => p.id !== id));
+    setCart(cart.filter(item => item.product.id !== id));
+  };
+
+  const handleDeleteAllProducts = () => {
+    setProducts([]);
+    setCart([]);
   };
 
   const handleAddCategory = async (id: string, name: any, icon?: string): Promise<{ success: boolean; error?: string }> => {
@@ -453,6 +483,27 @@ export default function App() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete category');
+      setCategories(data.categories);
+      return { success: true };
+    } catch (err: any) {
+      console.error(err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const handleUpdateCategory = async (id: string, name: any, icon?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`/api/categories/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-email': currentUser?.email || '',
+          'x-user-role': currentUser?.role || ''
+        },
+        body: JSON.stringify({ name, icon })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update category');
       setCategories(data.categories);
       return { success: true };
     } catch (err: any) {
@@ -549,32 +600,139 @@ export default function App() {
     }));
   };
 
-  const handleCartCheckout = () => {
+  const handleCartCheckout = async () => {
     if (cart.length === 0) return;
-    const orderCode = 'ORDER-' + Math.floor(100000 + Math.random() * 900000);
     
-    // Calculate total including addons and sauces
-    const subtotal = cart.reduce((sum, item) => {
+    // Check if customer is registered/logged in
+    if (!currentUser) {
+      setPendingCheckout(true);
+      alert(currentLang === 'ar' 
+        ? '⚠️ عذراً! يجب عليك تسجيل حساب عميل فخم أولاً في الموقع لإتمام طلب الطعام وإرساله للواتساب.\n\nسيقوم الموقع الآن بنقلك إلى صفحة التسجيل فوراً، وستبقى وجباتك محفوظة في السلة لتكمل الطلب تلقائياً بعد التسجيل!' 
+        : '⚠️ Sorry! You must register/login to a gourmet account first to finalize your food order and send it to WhatsApp.\n\nYou will now be redirected to the Registration page, and your cart items will be saved!'
+      );
+      setActiveAppTab('account');
+      return;
+    }
+
+    // Fetch unique order number
+    try {
+      const res = await fetch("/api/orders/next-number", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentOrderNumber(data.orderNumber);
+      } else {
+        setCurrentOrderNumber(Math.floor(Date.now() / 1000) - 1770000000);
+      }
+    } catch (err) {
+      setCurrentOrderNumber(Math.floor(Date.now() / 1000) - 1770000000);
+    }
+
+    // If logged in, open checkout details wizard
+    setIsCheckoutDetailsOpen(true);
+    setIsCartOpen(true);
+  };
+
+  const handleFinalizeOrderWhatsApp = () => {
+    if (!checkoutDate || !checkoutTime) {
+      alert(currentLang === 'ar' ? 'الرجاء اختيار تاريخ ووقت استلاف الطلب أولاً!' : 'Please choose a date and time to collect your gourmet order first!');
+      return;
+    }
+    if (!checkoutRulesAccepted) {
+      alert(currentLang === 'ar' ? 'يجب عليك الموافقة على القواعد الصارمة والالتزام بعدم تعديل الرسالة لإتمام الطلب!' : 'You must agree to the rules and commit to not modifying the message!');
+      return;
+    }
+
+    const orderCode = currentOrderNumber ? `#${currentOrderNumber}` : ('ORDER-' + Math.floor(100000 + Math.random() * 900000));
+    const subtotal = cartSubtotal;
+    const tax = Math.round(subtotal * 0.14);
+    const total = subtotal + tax;
+
+    const branchName = checkoutBranch === 'medical' 
+      ? (currentLang === 'ar' ? 'ميديكال بارك إيليت (التجمع الخامس)' : 'Medical Park Elite (Fifth Settlement)')
+      : (currentLang === 'ar' ? 'فرع الواحة (مدينة نصر)' : 'El-Waha Branch (Nasr City)');
+
+    const diningTypeStr = checkoutDiningType === 'takeaway'
+      ? (currentLang === 'ar' ? 'سفري / تيك أواي 🛍️' : 'Takeaway 🛍️')
+      : (currentLang === 'ar' ? 'تناول داخل الصالة 🍽️' : 'Dine-In 🍽️');
+
+    // Format list of food items
+    const itemsList = cart.map((item, idx) => {
       const addonsCost = item.selectedAddons?.reduce((s, a) => s + a.price, 0) || 0;
       const saucesCost = item.selectedSauces?.reduce((s, sd) => s + sd.price, 0) || 0;
       const singlePrice = item.product.price + addonsCost + saucesCost;
-      return sum + (singlePrice * item.quantity);
-    }, 0);
-    
-    const tax = Math.round(subtotal * 0.14); // 14% Egyptian Tax rate
-    const total = subtotal + tax;
+      const addonsList = item.selectedAddons?.map(a => `   + إضافي: ${a.name[currentLang] || a.name.en} (+${a.price} ج)`).join('\n') || '';
+      const saucesList = item.selectedSauces?.map(s => `   + صوص: ${s.name[currentLang] || s.name.en} (+${s.price} ج)`).join('\n') || '';
+      
+      let itemStr = `${idx + 1}. ${item.product.name[currentLang] || item.product.name.en} (عدد ${item.quantity}) = ${singlePrice * item.quantity} ج`;
+      if (addonsList) itemStr += `\n${addonsList}`;
+      if (saucesList) itemStr += `\n${saucesList}`;
+      return itemStr;
+    }).join('\n\n');
 
+    // User details (fallback to empty strings if not present)
+    const clientName = currentUser?.name || '';
+    const clientEmail = currentUser?.email || '';
+    const clientPhone = currentUser?.details?.phone || currentUser?.details?.regPhone || '';
+    const clientAltPhone = currentUser?.details?.alternativePhone || currentUser?.details?.regAltPhone || '';
+
+    const whatsappMessage = 
+`⚜️ *طلب طعام فاخر - مطعم French Touch* ⚜️
+----------------------------------------
+🔢 *رقم الأوردر الفريد:* ${orderCode}
+----------------------------------------
+👤 *بيانات العميل المسجل:*
+- الاسم الثلاثي: ${clientName}
+- الجيميل: ${clientEmail}
+- الهاتف الأساسي: ${clientPhone}
+- الهاتف الاحتياطي: ${clientAltPhone || '-'}
+
+📍 *تفاصيل الاستلام والفرع:*
+- الفرع المختار: ${branchName}
+- نوع الاستلام: ${diningTypeStr}
+- تاريخ الحضور: ${checkoutDate}
+- وقت الحضور: ${checkoutTime}
+
+🍽️ *قائمة المأكولات المطلوبة:*
+${itemsList}
+
+💰 *الحساب الإجمالي:*
+- المجموع الفرعي: ${subtotal} جنيه
+- ضريبة القيمة المضافة (14%): ${tax} جنيه
+- *المجموع الكلي الفاخر:* ${total} جنيه
+
+⚠️ *تنبيه صارم وهام جداً:*
+نظام مطعم French Touch يراقب سلامة الطلبات. لقد تم توثيق وحفظ بصمة حسابك وبياناتك في قاعدة بيانات المطور والمدير. 
+يُمنع منعاً باتاً تعديل أو مسح أو اللعب في أي من محتويات هذه الرسالة التلقائية في الواتساب. إذا قمت بحذف أو تعديل أي معلومة، فسيتم تجاهل طلبك فوراً وحظر حسابك الشخصي وبصمتك من النظام تلقائياً ولن يتم تفعيل الطلب!
+----------------------------------------`;
+
+    // Open WhatsApp
+    const whatsappUrl = `https://wa.me/201044686954?text=${encodeURIComponent(whatsappMessage)}`;
+    window.open(whatsappUrl, '_blank');
+
+    // Create order receipt to display in client dashboard or screen
     setOrderReceipt({
       code: orderCode,
       items: [...cart],
       subtotal,
       tax,
       total,
+      branch: branchName,
+      diningType: diningTypeStr,
+      date: checkoutDate,
+      time: checkoutTime,
       timestamp: new Date().toLocaleString()
     });
 
-    // Clear cart after checkout
+    // Reset States
     setCart([]);
+    setIsCheckoutDetailsOpen(false);
+    setIsCartOpen(false);
+    setPendingCheckout(false);
+
+    alert(currentLang === 'ar' 
+      ? '🎉 تم فتح محادثة الواتساب بنجاح وإرسال الطلب الفاخر!\nيرجى إرسال الرسالة كما هي دون تعديل لضمان موافقة المطبخ وتجهيز الطلب.'
+      : '🎉 WhatsApp checkout opened successfully!\nPlease send the message without modifications to guarantee order acceptance.'
+    );
   };
 
   const currentDayOfWeek = new Date().getDay();
@@ -614,25 +772,14 @@ export default function App() {
 
 
   // Developer Command Center view
-  if (currentUser?.role === 'Developer' && previewRole === 'Developer') {
+  if (currentUser?.role === 'Developer') {
     return (
       <DeveloperConsole
         currentLang={currentLang}
         currentUser={currentUser}
         onLogout={handleLogout}
         previewRole={previewRole}
-        setPreviewRole={(role) => {
-          setPreviewRole(role);
-          if (role !== 'Developer') {
-            if (role === 'Manager') {
-              setActiveAppTab('admin');
-              setIsAdminConsoleVisible(true);
-            } else {
-              setActiveAppTab('menu');
-              setIsAdminConsoleVisible(false);
-            }
-          }
-        }}
+        setPreviewRole={setPreviewRole}
       />
     );
   }
@@ -1023,33 +1170,35 @@ export default function App() {
                 {/* Grid Bento Widgets Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   
-                  {/* Widget 1: Live table reservation status */}
+                  {/* Widget 1: Live table reservation/order status */}
                   <div className="bg-slate-50 border border-slate-100 p-6 rounded-3xl flex flex-col justify-between space-y-4">
                     <div className="flex justify-between items-start">
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-                          {currentLang === 'ar' ? 'حالة طاولة العشاء' : 'Booking Desk'}
+                          {currentLang === 'ar' ? 'حالة طلب الطعام الفاخر' : 'Gourmet Order Status'}
                         </span>
                         <h4 className="serif-heading text-lg font-black text-brand-blue">
-                          {bookingReceipt ? (currentLang === 'ar' ? 'حجزك معتمد' : 'Reservation VIP') : (currentLang === 'ar' ? 'احجز طاولة الآن' : 'No Active Booking')}
+                          {orderReceipt ? (currentLang === 'ar' ? 'تم تحويل الطلب للواتساب 🚀' : 'Order Sent to WhatsApp 🚀') : (currentLang === 'ar' ? 'اطلب وجبتك الآن 🛍️' : 'Order to WhatsApp Now 🛍️')}
                         </h4>
                       </div>
-                      <span className={`p-2 rounded-xl text-xs font-mono font-bold ${bookingReceipt ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                        {bookingReceipt ? 'OK' : 'FREE'}
+                      <span className={`p-2 rounded-xl text-xs font-mono font-bold ${orderReceipt ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {orderReceipt ? 'SENT' : 'READY'}
                       </span>
                     </div>
 
                     <p className="text-gray-500 text-xs leading-relaxed">
-                      {bookingReceipt 
-                        ? `${bookingReceipt.name} • ${bookingReceipt.guests} ${currentLang === 'ar' ? 'أفراد' : 'Guests'}`
-                        : (currentLang === 'ar' ? 'احجز طاولتك مجاناً في أي من فروعنا الفاخرة بالقاهرة للحصول على مقعد مميز.' : 'Reserve a culinary experience slot for today and show your electronic receipt to the chef.')}
+                      {orderReceipt 
+                        ? (currentLang === 'ar' 
+                            ? `الطلب ${orderReceipt.code} • فرع ${orderReceipt.branch} • الاستلام ${orderReceipt.date} الساعة ${orderReceipt.time}`
+                            : `Order ${orderReceipt.code} • Branch ${orderReceipt.branch} • Pickup ${orderReceipt.date} @ ${orderReceipt.time}`)
+                        : (currentLang === 'ar' ? 'تصفح قائمتنا الملكية، صمم طلبك بالتفصيل والصلصات الإضافية، وسيتم نقله للواتساب بضغطة زر واحدة بجميع معلوماتك.' : 'Browse our royal menu, customize your options & sauces, and forward details seamlessly to WhatsApp in one tap.')}
                     </p>
 
                     <button
-                      onClick={() => setActiveAppTab('reserve')}
+                      onClick={() => setActiveAppTab('menu')}
                       className="w-full py-2.5 bg-slate-200/80 hover:bg-slate-300/90 text-brand-blue font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
                     >
-                      {bookingReceipt ? (currentLang === 'ar' ? 'عرض التذكرة' : 'View Ticket Pass') : (currentLang === 'ar' ? 'افتح الحجز الفوري' : 'Open Reservation Portal')}
+                      {currentLang === 'ar' ? 'تصفح قائمة الأطعمة 🍽️' : 'Browse Gourmet Menu 🍽️'}
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -1557,6 +1706,7 @@ export default function App() {
                     onRemoveManager={handleRemoveManager}
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
+                    onDeleteAllProducts={handleDeleteAllProducts}
                     onSaveExclusiveOffer={handleSaveExclusiveOffer}
                     onSaveWeeklyOffers={handleSaveWeeklyOffers}
                     onLogout={handleLogout}
@@ -1565,6 +1715,7 @@ export default function App() {
                     categories={categories}
                     onAddCategory={handleAddCategory}
                     onDeleteCategory={handleDeleteCategory}
+                    onUpdateCategory={handleUpdateCategory}
                   />
                 </div>
               </div>
@@ -1575,33 +1726,87 @@ export default function App() {
               <div className="space-y-8 animate-in fade-in duration-300">
                 <div>
                   <h2 className="serif-heading text-2xl md:text-3xl font-extrabold text-brand-blue">
-                    {currentLang === 'ar' ? 'حسابي الشخصي' : 'My Account'}
+                    {currentLang === 'ar' ? 'حسابي الشخصي والخدمات' : 'My Profile & Culinary Desk'}
                   </h2>
                   <p className="text-gray-500 text-xs mt-1">
-                    {currentLang === 'ar' ? 'إدارة تفاصيل حسابك، لغة التطبيق، والتحقق من فواتير طلباتك السابقة.' : 'Manage your profile details, application language, and view previous order receipts.'}
+                    {currentLang === 'ar' ? 'قم بإنشاء حساب زبون جديد، أو تصفح عروضك المخصصة والرسائل المرسلة إليك تلقائياً.' : 'Register a classic gourmet customer profile or manage your active subscription details.'}
                   </p>
                 </div>
 
-                <div className="max-w-xl mx-auto bg-white border border-slate-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+                <div className="max-w-xl mx-auto bg-white border border-slate-100 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
+                  
+                  {/* LOADING OVERLAY WHILE GEMINI CHECKS THE PICTURE */}
+                  {regLoading && (
+                    <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200">
+                      <div className="w-16 h-16 rounded-full border-4 border-brand-gold border-t-brand-blue animate-spin mb-4"></div>
+                      <h4 className="serif-heading text-lg font-black text-brand-blue mb-2">
+                        {currentLang === 'ar' ? '🔮 فحص ملامح الوجه بالذكاء الاصطناعي' : '🔮 AI Facial Feature Inspection'}
+                      </h4>
+                      <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
+                        {currentLang === 'ar' 
+                          ? 'يقوم نظامنا الآن بتحليل صورتك المرفوعة عبر ذكاء Gemini الاصطناعي للتأكد من أنها صورة شخص حقيقي بملامح ظاهرة، وتأكيد اشتراكك التلقائي...' 
+                          : 'Our system is currently analyzing your profile photo using Gemini AI to verify authentic human features and authorize your mandatory subscription...'}
+                      </p>
+                    </div>
+                  )}
+
                   {currentUser ? (
                     <div className="space-y-6">
                       <div className="flex flex-col sm:flex-row items-center gap-4 border-b border-slate-100 pb-6">
                         <img 
                           src={currentUser.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${currentUser.email}`} 
                           alt={currentUser.name} 
-                          className="w-16 h-16 rounded-full border-2 border-brand-gold shadow-md"
+                          className="w-20 h-20 rounded-full border-2 border-brand-gold shadow-md object-cover"
                           referrerPolicy="no-referrer"
                         />
                         <div className="text-center sm:text-start space-y-1">
                           <h3 className="serif-heading text-xl font-bold text-brand-blue">{currentUser.name}</h3>
                           <p className="text-xs text-slate-500 font-mono">{currentUser.email}</p>
+                          
+                          {currentUser.details && (
+                            <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                              📞 {currentUser.details.phone} | ☎️ {currentUser.details.alternativePhone}
+                            </p>
+                          )}
+
                           <span className="inline-block px-3 py-1 bg-brand-gold/10 text-brand-gold text-[9px] uppercase font-bold tracking-widest font-mono rounded-full mt-1.5">
                             {currentUser.role === 'Developer' 
                               ? (currentLang === 'ar' ? 'المطور المعتمد' : 'Primary Developer') 
                               : currentUser.role === 'Manager' 
                                 ? (currentLang === 'ar' ? 'مدير المطعم' : 'Restaurant Manager') 
-                                : (currentLang === 'ar' ? 'عميل كلاسيك' : 'Gourmet Customer')}
+                                : (currentLang === 'ar' ? 'زبون كلاسيك معتمد بالذكاء الاصطناعي ✓' : 'AI-Verified Classic Customer ✓')}
                           </span>
+                        </div>
+                      </div>
+
+                      {/* EXCLUSIVE AUTO-SENT PROMOS NEWSLETTER DISPLAY FOR ACTIVE CUSTOMERS */}
+                      <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-4 md:p-5 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">📬</span>
+                          <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider">
+                            {currentLang === 'ar' ? 'العروض والمنتجات الحصرية (مرسلة تلقائياً لبريدك المسجل)' : 'Your Mandatory Offers Newsletter (Sent to Your Gmail)'}
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-emerald-700 leading-relaxed">
+                          {currentLang === 'ar' 
+                            ? `مرحباً ${currentUser.name.split(' ')[0]}! لقد تم تفعيل إرسال جميع العروض الجديدة والأطباق الحصرية تلقائياً وإجبارياً إلى بريدك الإلكتروني [${currentUser.email}]. إليك ملخص النشرة الترحيبية الحالية:` 
+                            : `Hello ${currentUser.name.split(' ')[0]}! New discounts and newly curated French dishes are automatically broadcasted to your Gmail account [${currentUser.email}]. Your active subscriber portal overview:`}
+                        </p>
+                        
+                        <div className="space-y-2.5 pt-1">
+                          <div className="bg-white border border-emerald-200/50 p-2.5 rounded-xl text-[11px] flex justify-between items-center shadow-xs">
+                            <span className="font-bold text-emerald-900">{currentLang === 'ar' ? 'كود خصم الترحيب (20%):' : 'Welcome Promo Code (20%):'}</span>
+                            <span className="font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-xs select-all">WELCOME20</span>
+                          </div>
+                          
+                          <div className="bg-white border border-emerald-200/50 p-2.5 rounded-xl text-[11px] space-y-1 shadow-xs">
+                            <span className="font-bold text-emerald-900 block mb-1">🎁 {currentLang === 'ar' ? 'أحدث المنتجات التي تم إضافتها بالنظام وجاهزة للطلب:' : 'Newly Added Dishes In System:'}</span>
+                            <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1">
+                              <li>{currentLang === 'ar' ? 'بطاطس فرنش تاتش اللذيذة المجهزة بالجبنة والأعشاب البرية.' : 'French Touch Cheesy Wild Herb Fries.'}</li>
+                              <li>{currentLang === 'ar' ? 'سندوتشات الكروك موسيو الكلاسيكية بالخلطة الباريسية الفاخرة.' : 'Parisian Croque Monsieur Sandwiches.'}</li>
+                              <li>{currentLang === 'ar' ? 'الحلويات المبتكرة والماكارون الطازج.' : 'Curated Artisanal Macarons & Desserts.'}</li>
+                            </ul>
+                          </div>
                         </div>
                       </div>
 
@@ -1631,7 +1836,7 @@ export default function App() {
                         </div>
 
                         {orderReceipt && (
-                          <div className="bg-brand-blue/5 border border-brand-blue/10 rounded-2xl p-4 mt-4 space-y-3">
+                          <div className="bg-brand-blue/5 border border-brand-blue/10 rounded-2xl p-4 space-y-3">
                             <h4 className="text-xs font-black text-brand-blue flex items-center gap-1.5">
                               <span>🧾</span>
                               <span>{currentLang === 'ar' ? 'طلبك الأخير المعتمد' : 'Your Latest Receipt'}</span>
@@ -1664,82 +1869,234 @@ export default function App() {
                   ) : (
                     <div className="space-y-6">
                       <div className="text-center space-y-2">
+                        <span className="inline-block p-2 bg-brand-gold/10 rounded-full text-lg">✨</span>
                         <h3 className="serif-heading text-xl font-extrabold text-brand-blue">
-                          {currentLang === 'ar' ? 'تسجيل الدخول إلى حسابك' : 'Access Your Account'}
+                          {currentLang === 'ar' ? 'إنشاء حساب زبون جديد فخم' : 'Register Gourmet Customer Account'}
                         </h3>
-                        <p className="text-xs text-slate-500">
-                          {currentLang === 'ar' ? 'سجل الدخول لحفظ طلباتك وعروضك المفضلة وحجز طاولاتك بسهولة.' : 'Log in to manage your active table bookings and save culinary receipts.'}
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                          {currentLang === 'ar' 
+                            ? 'سجل حسابك مجاناً لتتمكن من الطلب وحجز الطاولات، وستصلك جميع عروضنا والمنتجات الجديدة تلقائياً وإجبارياً على بريدك الإلكتروني.' 
+                            : 'Sign up to manage table reservations, order dishes, and auto-subscribe to premium emails.'}
                         </p>
                       </div>
 
-                      <div className="space-y-4">
-                        <button
-                          onClick={() => {
-                            handleLoginSuccess({
-                              email: 'guest_' + Math.random().toString(36).substr(2, 5) + '@frenchtouch.com',
-                              name: currentLang === 'ar' ? 'عميل زائر' : 'Gourmet Guest',
-                              role: 'Customer'
-                            });
-                          }}
-                          className="w-full py-3.5 bg-brand-blue hover:bg-brand-blue/95 text-white font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <span>👑</span>
-                          <span>{currentLang === 'ar' ? 'الدخول كعميل زائر سريع' : 'Continue as Guest'}</span>
-                        </button>
+                      {regError && (
+                        <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-brand-red leading-relaxed flex items-start gap-2 animate-shake">
+                          <span className="text-sm">⚠️</span>
+                          <div>
+                            <span className="font-bold block mb-0.5">{currentLang === 'ar' ? 'حدث خطأ في التسجيل:' : 'Registration Refused:'}</span>
+                            {regError}
+                          </div>
+                        </div>
+                      )}
 
-                        <div className="relative flex py-2 items-center">
-                          <div className="flex-grow border-t border-slate-100"></div>
-                          <span className="flex-shrink mx-4 text-[10px] text-slate-400 font-mono font-bold uppercase">{currentLang === 'ar' ? 'أو للمدراء' : 'Or for Managers'}</span>
-                          <div className="flex-grow border-t border-slate-100"></div>
+                      <form 
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!regFirstName || !regSecondName || !regThirdName || !regEmail || !regPhone || !regAltPhone) {
+                            setRegError(currentLang === 'ar' ? 'يرجى إدخال كافة المعلومات النصية المطلوبة أولاً.' : 'Please enter all required text fields.');
+                            return;
+                          }
+                          if (!regPicture) {
+                            setRegError(currentLang === 'ar' ? 'صورة الحساب الشخصي إجبارية! يرجى رفع صورة واضحة لوجهك الشخصي.' : 'Profile picture is mandatory! Please upload a clear photo.');
+                            return;
+                          }
+
+                          setRegLoading(true);
+                          setRegError('');
+
+                          try {
+                            const response = await fetch('/api/auth/register-customer', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                firstName: regFirstName,
+                                secondName: regSecondName,
+                                thirdName: regThirdName,
+                                email: regEmail,
+                                phone: regPhone,
+                                alternativePhone: regAltPhone,
+                                picture: regPicture
+                              })
+                            });
+
+                            const data = await response.json();
+                            if (response.ok && data.success) {
+                              // Reset registration form values
+                              setRegFirstName('');
+                              setRegSecondName('');
+                              setRegThirdName('');
+                              setRegEmail('');
+                              setRegPhone('');
+                              setRegAltPhone('');
+                              setRegPicture('');
+                              
+                              // Trigger login
+                              handleLoginSuccess(data.user);
+                              
+                              // Show friendly success confirmation alert
+                              alert(currentLang === 'ar' 
+                                ? `🎉 تم تسجيل حسابك بنجاح ومطابقة ملامح صورتك بالذكاء الاصطناعي Gemini!\n📬 تم إرسال نشرة العروض والمنتجات الجديدة تلقائياً إلى بريدك الإلكتروني: ${data.user.email}` 
+                                : `🎉 Registration successful! Face matched successfully via Gemini AI.\n📬 New offers & dishes sent to your Gmail: ${data.user.email}`
+                              );
+                            } else {
+                              setRegError(data.error || 'Registration failed');
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            setRegError(currentLang === 'ar' ? 'فشل الاتصال بالخادم لمراجعة الصورة والبيانات.' : 'Server connection failed.');
+                          } finally {
+                            setRegLoading(false);
+                          }
+                        }} 
+                        className="space-y-4"
+                      >
+                        {/* TRIPLE NAME FIELDS */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                              {currentLang === 'ar' ? 'الاسم الأول *' : 'First Name *'}
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={regFirstName}
+                              onChange={(e) => setRegFirstName(e.target.value)}
+                              placeholder={currentLang === 'ar' ? 'مثال: أحمد' : 'e.g. Ahmad'}
+                              className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                              {currentLang === 'ar' ? 'الاسم الثاني *' : 'Second Name *'}
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={regSecondName}
+                              onChange={(e) => setRegSecondName(e.target.value)}
+                              placeholder={currentLang === 'ar' ? 'مثال: محمد' : 'e.g. Mohamed'}
+                              className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                              {currentLang === 'ar' ? 'الاسم الثالث *' : 'Third Name *'}
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={regThirdName}
+                              onChange={(e) => setRegThirdName(e.target.value)}
+                              placeholder={currentLang === 'ar' ? 'مثال: علي' : 'e.g. Ali'}
+                              className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                            />
+                          </div>
                         </div>
 
-                        <form onSubmit={(e) => {
-                          e.preventDefault();
-                          const formData = new FormData(e.currentTarget);
-                          const email = formData.get('email') as string;
-                          const password = formData.get('password') as string;
-                          if (!email || !password) return;
-
-                          fetch('/api/auth/manager-login', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email, password })
-                          })
-                          .then(res => res.json())
-                          .then(data => {
-                            if (data.success) {
-                              handleLoginSuccess(data.user);
-                            } else {
-                              alert(data.error || 'Login failed');
-                            }
-                          })
-                          .catch(err => {
-                            console.error(err);
-                            alert('Error connecting to server');
-                          });
-                        }} className="space-y-3">
+                        {/* EMAIL / GMAIL */}
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                            {currentLang === 'ar' ? 'البريد الإلكتروني (الجيميل الخاص بك) *' : 'Gmail Address *'}
+                          </label>
                           <input
                             type="email"
-                            name="email"
                             required
-                            placeholder={currentLang === 'ar' ? 'البريد الإلكتروني للمدير' : 'Manager Email'}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                            value={regEmail}
+                            onChange={(e) => setRegEmail(e.target.value)}
+                            placeholder="example@gmail.com"
+                            className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
                           />
-                          <input
-                            type="password"
-                            name="password"
-                            required
-                            placeholder={currentLang === 'ar' ? 'كلمة المرور' : 'Password'}
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
-                          />
-                          <button
-                            type="submit"
-                            className="w-full py-3 bg-brand-gold hover:bg-brand-gold/95 text-brand-blue font-bold rounded-xl text-xs transition-colors cursor-pointer"
-                          >
-                            {currentLang === 'ar' ? 'تسجيل دخول كمدير' : 'Manager Login'}
-                          </button>
-                        </form>
-                      </div>
+                        </div>
+
+                        {/* PHONE NUMBERS */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                              {currentLang === 'ar' ? 'رقم الهاتف *' : 'Phone Number *'}
+                            </label>
+                            <input
+                              type="tel"
+                              required
+                              value={regPhone}
+                              onChange={(e) => setRegPhone(e.target.value)}
+                              placeholder="01xxxxxxxxx"
+                              className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                              {currentLang === 'ar' ? 'رقم هاتف احتياطي *' : 'Alternative Phone *'}
+                            </label>
+                            <input
+                              type="tel"
+                              required
+                              value={regAltPhone}
+                              onChange={(e) => setRegAltPhone(e.target.value)}
+                              placeholder="01xxxxxxxxx"
+                              className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* MANDATORY HUMAN PHOTO UPLOAD */}
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-extrabold uppercase tracking-wider text-brand-blue">
+                            {currentLang === 'ar' ? 'صورة الحساب الشخصي (إجبارية بشرية حقيقية) *' : 'Mandatory Profile Photo (Real Human Face) *'}
+                          </label>
+                          
+                          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-brand-gold transition-all relative bg-slate-50/50">
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              required
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setRegPicture(reader.result as string);
+                                  setRegError('');
+                                };
+                                reader.readAsDataURL(file);
+                              }}
+                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                            />
+                            
+                            {regPicture ? (
+                              <div className="space-y-2">
+                                <img 
+                                  src={regPicture} 
+                                  alt="Preview" 
+                                  className="w-20 h-20 rounded-full mx-auto object-cover border-2 border-brand-gold shadow-md"
+                                />
+                                <span className="block text-[10px] text-emerald-600 font-bold">✓ تم تجهيز الصورة بنجاح</span>
+                                <span className="block text-[9px] text-slate-400">{currentLang === 'ar' ? 'انقر أو اسحب لتغيير الصورة' : 'Click or drag to change'}</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-1 py-2">
+                                <span className="text-2xl block">📸</span>
+                                <span className="block text-xs font-bold text-slate-600">{currentLang === 'ar' ? 'اختر صورة شخصية حقيقية لك' : 'Select a real photo of yourself'}</span>
+                                <span className="block text-[10px] text-slate-400 leading-relaxed max-w-xs mx-auto">
+                                  {currentLang === 'ar' 
+                                    ? 'يجب أن تكون صورتك الشخصية بملامح واضحة وظاهرة ليقبلها نظام التحقق من الوجه بالذكاء الاصطناعي Gemini.' 
+                                    : 'Your face features must be clearly visible. Selfies or portraits are verified live via Gemini AI.'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full py-4 bg-brand-blue hover:bg-brand-blue/95 text-white font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer transform hover:-translate-y-0.5"
+                        >
+                          <span>👑</span>
+                          <span>{currentLang === 'ar' ? 'إنشاء حساب الزبون وتأكيد الاشتراك' : 'Register & Authorize Account'}</span>
+                        </button>
+                      </form>
+
+                      {/* End of registration form */}
                     </div>
                   )}
                 </div>
@@ -1776,7 +2133,9 @@ export default function App() {
                 <div className="flex items-center gap-2">
                   <ShoppingBag className="w-5 h-5 text-brand-gold" />
                   <h3 className="serif-heading text-lg font-black text-brand-blue">
-                    {currentLang === 'ar' ? 'سلة المأكولات الفاخرة' : 'Gourmet Selection'}
+                    {isCheckoutDetailsOpen 
+                      ? (currentLang === 'ar' ? 'تجهيز تفاصيل الاستلام' : 'Finalize Delivery & Branch')
+                      : (currentLang === 'ar' ? 'سلة المأكولات الفاخرة' : 'Gourmet Selection')}
                   </h3>
                 </div>
                 <button 
@@ -1787,86 +2146,307 @@ export default function App() {
                 </button>
               </div>
 
-              {cart.length === 0 ? (
-                <div className="text-center py-20 space-y-3">
-                  <span className="text-5xl block animate-pulse">🍽️</span>
-                  <p className="text-sm font-semibold text-slate-400">
-                    {currentLang === 'ar' ? 'السلة فارغة حالياً' : 'Your gourmet tray is empty'}
-                  </p>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                    {currentLang === 'ar' ? 'تصفح قائمة الطعام في التطبيق وأضف خياراتك للحصول على طلب لذيذ!' : 'Add standard signature entrees, mains or drinks.'}
-                  </p>
+              {pendingCheckout && !currentUser ? (
+                /* VIEW 2: REGISTRATION REQUIRED NOTICE VIEW */
+                <div className="space-y-6 py-6 text-start">
+                  <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-3xl animate-bounce">
+                    ⚠️
+                  </div>
+                  
+                  <div className="space-y-3 text-center">
+                    <h4 className="serif-heading text-lg font-black text-brand-blue">
+                      {currentLang === 'ar' ? 'خطوة أخيرة مطلوبة: يجب التسجيل!' : 'Final Step: Registration Required!'}
+                    </h4>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      {currentLang === 'ar' 
+                        ? 'عذراً! طلبك الحالي معلق ومحفوظ في السلة مؤقتاً. لحمايتنا ولضمان جدية الطلبات في مطعم French Touch، يُشترط تسجيل حساب زبون حقيقي ورفع صورتك لتأكيدها بالذكاء الاصطناعي Gemini قبل إرسال الطلب للواتساب.' 
+                        : 'Sorry! Your current order is pending and saved. To guarantee authenticity, you must register a classic customer profile and upload your photo for live Gemini AI verification before WhatsApp forwarding.'}
+                    </p>
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl text-[11px] text-amber-800 leading-relaxed font-sans space-y-1">
+                    <span className="font-bold block">💡 {currentLang === 'ar' ? 'ماذا سيحدث لطلبك الحالي؟' : 'What happens to your current tray?'}</span>
+                    <p>{currentLang === 'ar' ? '• قمنا بحفظ الوجبات في السلة مؤقتاً لن تضيع.' : '• Your selected items are locked and will not be lost.'}</p>
+                    <p>{currentLang === 'ar' ? '• بمجرد انتهاء تسجيل الحساب، سيقوم الموقع تلقائياً بمتابعة هذا الطلب وعرض خيارات التوصيل.' : '• Once registered, the system redirects you here to select branch & time.'}</p>
+                  </div>
+
+                  <div className="space-y-2.5 pt-4">
+                    <button
+                      onClick={() => {
+                        setActiveAppTab('account');
+                        setIsCartOpen(false);
+                      }}
+                      className="w-full py-3.5 bg-brand-blue hover:bg-brand-blue/95 text-brand-cream font-black rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>👤</span>
+                      <span>{currentLang === 'ar' ? 'الانتقال للتسجيل الفوري الآن' : 'Go to Registration Now'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setPendingCheckout(false)}
+                      className="w-full py-3 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                    >
+                      {currentLang === 'ar' ? 'العودة لمشاهدة مأكولات السلة' : 'Return to Gourmet Tray'}
+                    </button>
+                  </div>
+                </div>
+              ) : isCheckoutDetailsOpen && currentUser ? (
+                /* VIEW 3: CHECKOUT DETAILS WIZARD FORM */
+                <div className="space-y-5 py-2 text-start">
+                  
+                  {/* PROMINENT ORDER NUMBER & SCREENSHOT CAPTURE BANNER */}
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 border-2 border-dashed border-amber-300 rounded-3xl p-5 text-center space-y-3 relative overflow-hidden shadow-sm">
+                    <div className="absolute top-0 right-0 p-1 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest rounded-bl-xl">
+                      {currentLang === 'ar' ? 'معتمد' : 'VERIFIED'}
+                    </div>
+
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-xl animate-pulse">📸</span>
+                      <h4 className="serif-heading text-sm font-black text-brand-blue tracking-tight">
+                        {currentLang === 'ar' ? 'التقط لقطة شاشة الآن!' : 'Take a Screenshot Now!'}
+                      </h4>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        {currentLang === 'ar' ? 'رقم طلبك الفريد والنهائي' : 'Your Unique Order ID'}
+                      </p>
+                      <div className="text-4xl font-black text-amber-600 font-mono tracking-wider animate-bounce py-1">
+                        #{currentOrderNumber || '...'}
+                      </div>
+                    </div>
+
+                    <p className="text-[10.5px] text-brand-blue font-bold leading-relaxed max-w-sm mx-auto font-sans">
+                      {currentLang === 'ar' 
+                        ? '⚠️ احتفظ بهذا الرقم جيداً! سوف تستلم طلبك وتأخذه من الفرع فوراً بمجرد إخبار الكاشير بهذا الرقم ليتعرف على أوردرك.' 
+                        : '⚠️ Keep this number! You will receive and collect your order at the salon immediately by stating this verified number.'}
+                    </p>
+                  </div>
+
+                  {/* Collapsible/Compact items list summary */}
+                  <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-2xl">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono mb-2">
+                      {currentLang === 'ar' ? 'ملخص مأكولات الطلب الفاخر' : 'Your Gourmet Tray Summary'}
+                    </div>
+                    <div className="max-h-24 overflow-y-auto space-y-1.5 divide-y divide-slate-200/40 text-[11px]">
+                      {cart.map((item) => (
+                        <div key={item.id} className="pt-1.5 flex justify-between text-brand-blue font-bold">
+                          <span>{item.product.name[currentLang] || item.product.name.en} <span className="font-mono text-slate-400 font-normal">x{item.quantity}</span></span>
+                          <span className="font-mono text-amber-600">{item.product.price * item.quantity} ج</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* BRANCH SELECTION */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue">
+                      {currentLang === 'ar' ? 'اختر فرع الاستلام المعتمد *' : 'Choose Pickup Branch *'}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setCheckoutBranch('medical')}
+                        className={`p-3 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
+                          checkoutBranch === 'medical'
+                            ? 'bg-brand-blue/5 border-brand-blue text-brand-blue ring-1 ring-brand-blue'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="text-base mb-1">🏥</div>
+                        <div>{currentLang === 'ar' ? 'التجمع الخامس' : 'Fifth Settlement'}</div>
+                        <div className="text-[9px] text-slate-400 font-normal mt-0.5">ميديكال بارك</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setCheckoutBranch('waha')}
+                        className={`p-3 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
+                          checkoutBranch === 'waha'
+                            ? 'bg-brand-blue/5 border-brand-blue text-brand-blue ring-1 ring-brand-blue'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="text-base mb-1">🌳</div>
+                        <div>{currentLang === 'ar' ? 'مدينة نصر' : 'Nasr City'}</div>
+                        <div className="text-[9px] text-slate-400 font-normal mt-0.5">فرع الواحة</div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* DINING TYPE (TAKEAWAY VS DINE-IN) */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue">
+                      {currentLang === 'ar' ? 'طريقة تناول الطعام *' : 'Dining Option *'}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setCheckoutDiningType('takeaway')}
+                        className={`p-3 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
+                          checkoutDiningType === 'takeaway'
+                            ? 'bg-brand-blue/5 border-brand-blue text-brand-blue ring-1 ring-brand-blue'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="block text-base mb-1">🛍️</span>
+                        <span>{currentLang === 'ar' ? 'تيك أواي / سفري' : 'Takeaway / To-Go'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setCheckoutDiningType('dinein')}
+                        className={`p-3 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
+                          checkoutDiningType === 'dinein'
+                            ? 'bg-brand-blue/5 border-brand-blue text-brand-blue ring-1 ring-brand-blue'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="block text-base mb-1">🍽️</span>
+                        <span>{currentLang === 'ar' ? 'أكل داخل الصالة' : 'Dine-In / Salon'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* DATE & TIME SELECTORS */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                        {currentLang === 'ar' ? 'تاريخ الاستلام *' : 'Pickup Date *'}
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={checkoutDate}
+                        onChange={(e) => setCheckoutDate(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-brand-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                        {currentLang === 'ar' ? 'وقت الاستلام *' : 'Pickup Time *'}
+                      </label>
+                      <input
+                        type="time"
+                        required
+                        value={checkoutTime}
+                        onChange={(e) => setCheckoutTime(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-brand-blue"
+                      />
+                    </div>
+                  </div>
+
+                  {/* STRICT RULES STYLISH BOX */}
+                  <div className="bg-rose-50 border border-rose-100 rounded-2xl p-3.5 space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-brand-red flex items-center gap-1 animate-pulse">
+                      <span>🛑</span>
+                      <span>{currentLang === 'ar' ? 'تنبيه صارم وهام جداً للزبون' : 'Strict Restrictive Decree'}</span>
+                    </span>
+                    <p className="text-[10px] text-brand-red leading-relaxed font-sans">
+                      {currentLang === 'ar' 
+                        ? 'سيقوم الموقع الآن بتحويلك للواتساب مع رسالة تلقائية مجهزة بجميع بياناتك المسجلة والوجبات. يمنع منعاً باتاً تعديل، أو حذف، أو تشويه أي جزء من الرسالة. في حال إرسال بيانات معدلة أو كاذبة، سيقوم النظام تلقائياً بتعطيل حسابك وحظر بصمتك نهائياً من دخول المطعم!' 
+                        : 'You will be redirected to WhatsApp with an auto-docket message containing food tray and account metadata. Modifying or deleting any character results in instant, permanent account ban across all branches!'}
+                    </p>
+                    
+                    <label className="flex items-start gap-2 pt-1 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={checkoutRulesAccepted}
+                        onChange={(e) => setCheckoutRulesAccepted(e.target.checked)}
+                        className="mt-0.5 rounded text-brand-red focus:ring-brand-red border-slate-300"
+                      />
+                      <span className="text-[9px] font-black text-slate-700 leading-normal">
+                        {currentLang === 'ar' 
+                          ? 'أقر وأتعهد بالالتزام بالقواعد وعدم تعديل الرسالة التلقائية نهائياً.' 
+                          : 'I solemnly pledge to obey all salon rules and not modify the docket text.'}
+                      </span>
+                    </label>
+                  </div>
+
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {cart.map((item) => {
-                    const addonsCost = item.selectedAddons?.reduce((s, a) => s + a.price, 0) || 0;
-                    const saucesCost = item.selectedSauces?.reduce((s, sd) => s + sd.price, 0) || 0;
-                    const singlePrice = item.product.price + addonsCost + saucesCost;
+                /* VIEW 1: STANDARD GOURMET TRAY LIST */
+                cart.length === 0 ? (
+                  <div className="text-center py-20 space-y-3">
+                    <span className="text-5xl block animate-pulse">🍽️</span>
+                    <p className="text-sm font-semibold text-slate-400">
+                      {currentLang === 'ar' ? 'السلة فارغة حالياً' : 'Your gourmet tray is empty'}
+                    </p>
+                    <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                      {currentLang === 'ar' ? 'تصفح قائمة الطعام في التطبيق وأضف خياراتك للحصول على طلب لذيذ!' : 'Add standard signature entrees, mains or drinks.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {cart.map((item) => {
+                      const addonsCost = item.selectedAddons?.reduce((s, a) => s + a.price, 0) || 0;
+                      const saucesCost = item.selectedSauces?.reduce((s, sd) => s + sd.price, 0) || 0;
+                      const singlePrice = item.product.price + addonsCost + saucesCost;
 
-                    return (
-                      <div key={item.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200/40">
-                        <img 
-                          src={item.product.image} 
-                          alt="" 
-                          className="w-12 h-12 rounded-xl object-cover mt-0.5" 
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="flex-1 min-w-0 text-start">
-                          <h4 className="text-xs font-extrabold text-brand-blue truncate">
-                            {item.product.name[currentLang] || item.product.name.en}
-                          </h4>
-                          
-                          {/* Selected Customizations list */}
-                          {((item.selectedAddons && item.selectedAddons.length > 0) || 
-                            (item.selectedSauces && item.selectedSauces.length > 0)) && (
-                            <div className="text-[9px] text-slate-500 leading-tight space-y-0.5 mt-1 font-sans">
-                              {item.selectedAddons?.map((a) => (
-                                <div key={a.id} className="text-slate-500 flex justify-between">
-                                  <span>• {a.name[currentLang] || a.name.en}</span>
-                                </div>
-                              ))}
-                              {item.selectedSauces?.map((s) => (
-                                <div key={s.id} className="text-slate-500 flex justify-between">
-                                  <span>• {s.name[currentLang] || s.name.en}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                      return (
+                        <div key={item.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200/40">
+                          <img 
+                            src={item.product.image} 
+                            alt="" 
+                            className="w-12 h-12 rounded-xl object-cover mt-0.5" 
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="flex-1 min-w-0 text-start">
+                            <h4 className="text-xs font-extrabold text-brand-blue truncate">
+                              {item.product.name[currentLang] || item.product.name.en}
+                            </h4>
+                            
+                            {/* Selected Customizations list */}
+                            {((item.selectedAddons && item.selectedAddons.length > 0) || 
+                              (item.selectedSauces && item.selectedSauces.length > 0)) && (
+                              <div className="text-[9px] text-slate-500 leading-tight space-y-0.5 mt-1 font-sans">
+                                {item.selectedAddons?.map((a) => (
+                                  <div key={a.id} className="text-slate-500 flex justify-between">
+                                    <span>• {a.name[currentLang] || a.name.en}</span>
+                                  </div>
+                                ))}
+                                {item.selectedSauces?.map((s) => (
+                                  <div key={s.id} className="text-slate-500 flex justify-between">
+                                    <span>• {s.name[currentLang] || s.name.en}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
 
-                          <p className="text-[10px] text-brand-gold font-bold font-mono mt-1">
-                            {singlePrice} {t.currency}
-                          </p>
+                            <p className="text-[10px] text-brand-gold font-bold font-mono mt-1">
+                              {singlePrice} {t.currency}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 self-center">
+                            <button 
+                              onClick={() => handleUpdateQuantity(item.id, -1)}
+                              className="p-1 hover:bg-white rounded border border-slate-200 text-slate-600 cursor-pointer"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="text-xs font-black font-mono w-4 text-center">{item.quantity}</span>
+                            <button 
+                              onClick={() => handleUpdateQuantity(item.id, 1)}
+                              className="p-1 hover:bg-white rounded border border-slate-200 text-slate-600 cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                            <button 
+                              onClick={() => handleRemoveFromCart(item.id)}
+                              className="p-1 text-brand-red hover:bg-red-50 rounded cursor-pointer ml-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 self-center">
-                          <button 
-                            onClick={() => handleUpdateQuantity(item.id, -1)}
-                            className="p-1 hover:bg-white rounded border border-slate-200 text-slate-600 cursor-pointer"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <span className="text-xs font-black font-mono w-4 text-center">{item.quantity}</span>
-                          <button 
-                            onClick={() => handleUpdateQuantity(item.id, 1)}
-                            className="p-1 hover:bg-white rounded border border-slate-200 text-slate-600 cursor-pointer"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                          <button 
-                            onClick={() => handleRemoveFromCart(item.id)}
-                            className="p-1 text-brand-red hover:bg-red-50 rounded cursor-pointer ml-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )
               )}
             </div>
 
-            {cart.length > 0 && (
+            {cart.length > 0 && !pendingCheckout && (
               <div className="border-t border-slate-100 pt-6 space-y-4">
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between text-slate-500">
@@ -1883,16 +2463,32 @@ export default function App() {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    handleCartCheckout();
-                    setIsCartOpen(false);
-                  }}
-                  className="w-full py-3.5 bg-brand-blue hover:bg-brand-blue/95 text-brand-cream font-black rounded-2xl text-xs shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <span>🥂</span>
-                  <span>{currentLang === 'ar' ? 'تأكيد طلب الطعام' : 'Checkout & Generate Receipt'}</span>
-                </button>
+                {isCheckoutDetailsOpen && currentUser ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => setIsCheckoutDetailsOpen(false)}
+                      className="py-3.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-2xl text-xs transition-colors cursor-pointer text-center"
+                    >
+                      {currentLang === 'ar' ? 'تعديل السلة' : 'Edit Tray'}
+                    </button>
+                    
+                    <button
+                      onClick={handleFinalizeOrderWhatsApp}
+                      className="col-span-2 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl text-xs shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>🚀</span>
+                      <span>{currentLang === 'ar' ? 'إرسال للواتساب' : 'Send to WhatsApp'}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleCartCheckout}
+                    className="w-full py-3.5 bg-brand-blue hover:bg-brand-blue/95 text-brand-cream font-black rounded-2xl text-xs shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>🥂</span>
+                    <span>{currentLang === 'ar' ? 'تأكيد طلب الطعام' : 'Checkout & Generate Receipt'}</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1990,21 +2586,6 @@ export default function App() {
         currentLang={currentLang}
         onConfirm={handleCustomizerConfirm}
       />
-
-      {/* FLOATING DEVELOPER QUICK SWITCHER HELPER */}
-      {isDeveloper && previewRole !== 'Developer' && (
-        <div className="fixed bottom-20 sm:bottom-6 right-6 z-50 animate-bounce">
-          <button
-            onClick={() => setPreviewRole('Developer')}
-            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-stone-950 font-black px-4.5 py-3 rounded-full shadow-2xl transition-all hover:scale-105 active:scale-95 border border-amber-300 cursor-pointer"
-          >
-            <span className="text-sm">🛠️</span>
-            <span className="text-xs font-black uppercase tracking-wider">
-              {currentLang === 'ar' ? 'العودة لبوابة المطور' : 'Back to Developer Portal'}
-            </span>
-          </button>
-        </div>
-      )}
 
     </div>
   );
