@@ -1,30 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <!-- Royal Navy Background -->
-  <rect width="100" height="100" rx="24" fill="#0A1C3A"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <defs>
+    <linearGradient id="gold-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#BF953F" />
+      <stop offset="25%" stop-color="#FCF6BA" />
+      <stop offset="50%" stop-color="#B38728" />
+      <stop offset="75%" stop-color="#FBF5B7" />
+      <stop offset="100%" stop-color="#AA771C" />
+    </linearGradient>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600&amp;family=Cinzel:wght@500&amp;display=swap');
+      .title { font-family: 'Playfair Display', serif; font-size: 85px; font-weight: 600; font-style: italic; fill: url(#gold-grad); text-anchor: middle; }
+      .subtitle { font-family: 'Cinzel', serif; font-size: 40px; font-weight: 500; fill: url(#gold-grad); text-anchor: middle; letter-spacing: 12px; }
+    </style>
+  </defs>
+
+  <!-- Deep Blue Background Circular -->
+  <rect width="500" height="500" rx="250" fill="#0b1021"/>
   
-  <!-- Outer Elegance Ring -->
-  <circle cx="50" cy="50" r="42" fill="none" stroke="#D4AF37" stroke-width="2" stroke-dasharray="2 2"/>
-  <circle cx="50" cy="50" r="38" fill="none" stroke="#D4AF37" stroke-width="1" opacity="0.6"/>
+  <!-- Outer Decorative Golden Rings -->
+  <circle cx="250" cy="250" r="235" fill="none" stroke="url(#gold-grad)" stroke-width="4"/>
+  <circle cx="250" cy="250" r="220" fill="none" stroke="url(#gold-grad)" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <circle cx="250" cy="250" r="205" fill="none" stroke="url(#gold-grad)" stroke-width="2"/>
 
-  <!-- Royal Fleur-de-lis & Chef Hat Emblem -->
-  <g transform="translate(50, 48) scale(0.9)">
-    <!-- Central Spear / Fork Blade -->
-    <path d="M 0,-25 C 2,-15 5,-5 12,0 C 5,2 2,12 0,22 C -2,12 -5,2 -12,0 C -5,-5 -2,-15 0,-25 Z" fill="#D4AF37"/>
-    
-    <!-- Left Wing (Fleur-de-lis petal) -->
-    <path d="M -2,-8 C -12,-18 -25,-12 -22,-2 C -18,4 -10,6 -2,5 C -5,11 -1,20 2,21" fill="none" stroke="#D4AF37" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M -2,-8 C -12,-18 -25,-12 -22,-2 C -18,4 -10,6 -2,5" fill="#D4AF37" opacity="0.9"/>
-    
-    <!-- Right Wing (Fleur-de-lis petal) -->
-    <path d="M 2,-8 C 12,-18 25,-12 22,-2 C 18,4 10,6 2,5 C 5,11 1,20 -2,21" fill="none" stroke="#D4AF37" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M 2,-8 C 12,-18 25,-12 22,-2 C 18,4 10,6 2,5" fill="#D4AF37" opacity="0.9"/>
+  <!-- Elegant Star / Diamond Motif Top -->
+  <g transform="translate(250, 110) scale(1.2)">
+    <path d="M0,-25 L4,-6 L25,0 L4,6 L0,25 L-4,6 L-25,0 L-4,-6 Z" fill="url(#gold-grad)" />
+    <circle cx="0" cy="0" r="3" fill="#0b1021"/>
+  </g>
 
-    <!-- Bottom Ribbon / Band representing Chef Hat base -->
-    <path d="M -16,8 Q 0,11 16,8 Q 18,14 14,14 Q 0,16 -14,14 Q -18,14 -16,8 Z" fill="#D4AF37"/>
-    
-    <!-- Foundation Stars (Fine Dining Excellence) -->
-    <circle cx="0" cy="20" r="2.5" fill="#D4AF37"/>
-    <circle cx="-10" cy="18" r="2" fill="#D4AF37"/>
-    <circle cx="10" cy="18" r="2" fill="#D4AF37"/>
+  <!-- Text: French -->
+  <text x="250" y="240" class="title">French</text>
+  
+  <!-- Fancy Underline / Swirl -->
+  <path d="M 160 265 Q 250 285 340 265" fill="none" stroke="url(#gold-grad)" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 230 273 L 270 273" fill="none" stroke="url(#gold-grad)" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Text: Touch -->
+  <text x="258" y="325" class="subtitle">TOUCH</text>
+
+  <!-- Elegant Star / Diamond Motif Bottom -->
+  <g transform="translate(250, 395) scale(0.8)">
+    <path d="M0,-20 L3,-5 L20,0 L3,5 L0,20 L-3,5 L-20,0 L-3,-5 Z" fill="url(#gold-grad)" />
   </g>
 </svg>

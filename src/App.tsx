@@ -187,13 +187,13 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSecretPortal, setIsSecretPortal] = useState(() => {
     const path = window.location.pathname.toLowerCase().replace(/\/$/, "");
-    return path === "/portal-xyz987";
+    return path === "/french-touch-2572010-yg";
   });
 
   useEffect(() => {
     const handleLocationCheck = () => {
       const path = window.location.pathname.toLowerCase().replace(/\/$/, "");
-      setIsSecretPortal(path === "/portal-xyz987");
+      setIsSecretPortal(path === "/french-touch-2572010-yg");
     };
     window.addEventListener('popstate', handleLocationCheck);
     return () => window.removeEventListener('popstate', handleLocationCheck);
