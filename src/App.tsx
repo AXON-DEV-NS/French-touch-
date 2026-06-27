@@ -1299,20 +1299,6 @@ ${itemsList}
 
             {/* Navigation Menu */}
             <nav className="space-y-1.5">
-              {(isManager || isDeveloper) && (
-                <button
-                  onClick={() => { setActiveAppTab('dashboard'); setIsAdminConsoleVisible(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold transition-all transform active:scale-98 cursor-pointer ${
-                    activeAppTab === 'dashboard'
-                      ? 'bg-brand-blue text-[#FDFBF7] shadow-md shadow-brand-blue/15'
-                      : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <LayoutDashboard className="w-4.5 h-4.5 text-brand-gold" />
-                  <span>{currentLang === 'ar' ? 'لوحة التحكم الرئيسية' : 'Dashboard Hub'}</span>
-                </button>
-              )}
-
               <button
                 onClick={() => { setActiveAppTab('menu'); setIsAdminConsoleVisible(false); }}
                 id="tab-btn-menu"
@@ -1606,25 +1592,6 @@ ${itemsList}
                     <MenuSection
                       products={products}
                       currentLang={currentLang}
-                      isManager={isManager}
-                      onEditProduct={(p) => {
-                        setActiveAppTab('admin');
-                        setIsAdminConsoleVisible(true);
-                        setEditingProduct(p);
-                      }}
-                      onDeleteProduct={handleDeleteProduct}
-                      onAddProductClick={() => {
-                        setActiveAppTab('admin');
-                        setIsAdminConsoleVisible(true);
-                        setEditingProduct({ 
-                          id: 'new', 
-                          name: { ar: '', en: '', fr: '', it: '' }, 
-                          description: { ar: '', en: '', fr: '', it: '' }, 
-                          price: 150, 
-                          category: 'sandwiches', 
-                          image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80' 
-                        });
-                      }}
                       onAddToCart={handleAddToCart}
                       categories={categories}
                     />
@@ -2924,18 +2891,6 @@ ${itemsList}
 
       {/* 5. RESPONSIVE MOBILE APP BOTTOM NAVIGATION BAR */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] flex justify-around py-2 shrink-0">
-        {(isManager || isDeveloper) && (
-          <button
-            onClick={() => { setActiveAppTab('dashboard'); setIsAdminConsoleVisible(false); }}
-            className={`flex flex-col items-center gap-0.5 text-[9px] font-bold py-1 px-3 rounded-xl transition-all ${
-              activeAppTab === 'dashboard' ? 'text-brand-blue scale-105 font-black' : 'text-slate-400'
-            }`}
-          >
-            <LayoutDashboard className={`w-5 h-5 ${activeAppTab === 'dashboard' ? 'text-brand-gold' : ''}`} />
-            <span>{currentLang === 'ar' ? 'الرئيسية' : 'Home'}</span>
-          </button>
-        )}
-
         <button
           onClick={() => { setActiveAppTab('menu'); setIsAdminConsoleVisible(false); }}
           className={`flex flex-col items-center gap-0.5 text-[9px] font-bold py-1 px-3 rounded-xl transition-all ${

@@ -83,10 +83,6 @@ function getProductOrigin(product: Product, lang: Language): {
 interface MenuSectionProps {
   products: Product[];
   currentLang: Language;
-  isManager: boolean;
-  onEditProduct: (product: Product) => void;
-  onDeleteProduct: (id: string) => void;
-  onAddProductClick: () => void;
   onAddToCart?: (product: Product) => void;
   categories: CategoryItem[];
 }
@@ -94,10 +90,6 @@ interface MenuSectionProps {
 export default function MenuSection({
   products,
   currentLang,
-  isManager,
-  onEditProduct,
-  onDeleteProduct,
-  onAddProductClick,
   onAddToCart,
   categories = []
 }: MenuSectionProps) {
@@ -131,17 +123,6 @@ export default function MenuSection({
               : 'Savor the most exquisite flavors, prepared with ultimate passion.'}
           </p>
         </div>
-
-        {/* Manager Quick Add Button */}
-        {isManager && (
-          <button
-            onClick={onAddProductClick}
-            className="self-start md:self-auto px-5 py-2.5 bg-brand-gold text-brand-blue font-bold rounded-xl text-xs flex items-center gap-2 shadow-md hover:bg-brand-gold/90 transition-all transform hover:-translate-y-0.5"
-          >
-            <Plus className="w-4 h-4" />
-            {t.addProduct}
-          </button>
-        )}
       </div>
 
       {/* Category Tabs */}
@@ -170,14 +151,6 @@ export default function MenuSection({
           <p className="text-gray-400 text-sm font-medium">
             {currentLang === 'ar' ? 'لا توجد أصناف في هذه الفئة حالياً.' : 'No items available in this category yet.'}
           </p>
-          {isManager && (
-            <button
-              onClick={onAddProductClick}
-              className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-brand-gold underline hover:text-brand-blue"
-            >
-              {t.addProduct} <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -206,26 +179,6 @@ export default function MenuSection({
                     <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
                   </div>
                 </div>
-
-                {/* Manager Quick Actions overlay */}
-                {isManager && (
-                  <div className="absolute top-4 right-4 flex gap-1.5">
-                    <button
-                      onClick={() => onEditProduct(product)}
-                      className="p-2 bg-white/95 backdrop-blur-sm text-brand-blue hover:bg-brand-blue hover:text-white rounded-xl shadow-md transition-all duration-200"
-                      title={t.editProduct}
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteProduct(product.id)}
-                      className="p-2 bg-white/95 backdrop-blur-sm text-brand-red hover:bg-brand-red hover:text-white rounded-xl shadow-md transition-all duration-200"
-                      title={t.delete}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Product Info Description Area */}
