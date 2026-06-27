@@ -100,12 +100,12 @@ export default function LoginModal({
           </div>
 
           <h3 className="serif-heading text-xl font-bold text-brand-blue tracking-tight">
-            {currentLang === 'ar' ? 'بوابة المطور والمدراء' : 'Secure Management Gate'}
+            {currentLang === 'ar' ? 'بوابة الإدارة والمشرفين' : 'Management & Staff Portal'}
           </h3>
           <p className="text-xs text-gray-500 leading-relaxed max-w-xs mx-auto">
             {currentLang === 'ar' 
-              ? 'تسجيل الدخول الآمن للمشرفين والمدراء المعتمدين لمطعم فرنش تاتش' 
-              : 'Authorized developer and staff portal for French Touch Restaurant'}
+              ? 'تسجيل الدخول الآمن للمشرفين والموظفين المعتمدين لمطعم فرنش تاتش' 
+              : 'Authorized management and staff portal for French Touch Restaurant'}
           </p>
         </div>
 
@@ -127,7 +127,7 @@ export default function LoginModal({
                 type="email"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="e.g. oren.on.oren.25@gmail.com"
+                placeholder="e.g. manager@frenchtouch.com"
                 required
                 className="w-full text-xs p-3.5 pl-10 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue font-mono"
               />

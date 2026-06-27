@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const app = express();
 const PORT = 3000;
@@ -62,6 +62,11 @@ interface RegisteredCustomer {
   email: string;
   picture: string; // base64 or URL
   registeredAt: string;
+  aiAnalysis?: {
+    culinaryMood: string;
+    personalityAnalysis: string;
+    recommendedDish: string;
+  };
 }
 
 interface EmailLogObj {
@@ -70,6 +75,57 @@ interface EmailLogObj {
   body: string;
   sentAt: string;
   status: "DELIVERED";
+}
+
+interface Product {
+  id: string;
+  name: { ar: string; en: string; fr: string; it: string };
+  description: { ar: string; en: string; fr: string; it: string };
+  price: number;
+  category: string;
+  image: string;
+  canHaveAddons?: boolean;
+  canHaveSauces?: boolean;
+}
+
+interface ExclusiveOffer {
+  id: string;
+  title: { ar: string; en: string; fr: string; it: string };
+  description: { ar: string; en: string; fr: string; it: string };
+  discount: string;
+  endTime: string;
+  image: string;
+  active: boolean;
+}
+
+interface WeeklyOffer {
+  dayOfWeek: number;
+  title: { ar: string; en: string; fr: string; it: string };
+  description: { ar: string; en: string; fr: string; it: string };
+  discount: string;
+  active: boolean;
+}
+
+interface ReviewReply {
+  id: string;
+  userEmail: string;
+  userName: string;
+  userPicture: string;
+  role: "Customer" | "Manager" | "Developer";
+  text: string;
+  createdAt: string;
+}
+
+interface RestaurantReview {
+  id: string;
+  userEmail: string;
+  userName: string;
+  userPicture: string;
+  role: "Customer" | "Manager" | "Developer";
+  rating: number;
+  comment: string;
+  createdAt: string;
+  replies: ReviewReply[];
 }
 
 interface DbSchema {
@@ -82,6 +138,10 @@ interface DbSchema {
   emailLogs?: EmailLogObj[];
   blockedCustomers?: RegisteredCustomer[];
   orderCounter?: number;
+  products?: Product[];
+  exclusiveOffer?: ExclusiveOffer;
+  weeklyOffers?: WeeklyOffer[];
+  reviews?: RestaurantReview[];
 }
 
 const DEFAULT_CATEGORIES = [
@@ -142,6 +202,10 @@ function readDb(): DbSchema {
       parsed.blockedCustomers = [];
       changed = true;
     }
+    if (!parsed.reviews) {
+      parsed.reviews = [];
+      changed = true;
+    }
     if (parsed.managers) {
       parsed.managers = parsed.managers.map((m: any) => {
         if (typeof m === "string") {
@@ -165,7 +229,7 @@ function readDb(): DbSchema {
     return parsed;
   } catch (error) {
     console.error("Error reading database:", error);
-    return { managers: [], visitors: [], pageViews: 0, categories: DEFAULT_CATEGORIES, subscribers: [], registeredCustomers: [], emailLogs: [] };
+    return { managers: [], visitors: [], pageViews: 0, categories: DEFAULT_CATEGORIES, subscribers: [], registeredCustomers: [], emailLogs: [], reviews: [] };
   }
 }
 
@@ -182,7 +246,7 @@ function writeDb(data: DbSchema) {
 // API ROUTES
 // ----------------------------------------------------
 
-// Security Middlewares for Role Separation
+// Security Middlewares for Role Separation with Camouflage (404 Not Found instead of 403)
 function requireDeveloper(req: express.Request, res: express.Response, next: express.NextFunction) {
   const email = (req.headers["x-user-email"] as string || "").trim().toLowerCase();
   const role = (req.headers["x-user-role"] as string || "").trim();
@@ -191,7 +255,8 @@ function requireDeveloper(req: express.Request, res: express.Response, next: exp
     return next();
   }
   
-  return res.status(403).json({ error: "Access denied. Only the primary Developer possesses full authorization to access or modify this resource." });
+  // Camouflage security: Return standard 404 to hide the endpoint's existence
+  return res.status(404).send("Not Found");
 }
 
 function requireManagerOrDeveloper(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -202,8 +267,18 @@ function requireManagerOrDeveloper(req: express.Request, res: express.Response, 
     return next();
   }
   
-  return res.status(403).json({ error: "Access denied. You must be an authorized Manager or Developer to perform this action." });
+  // Camouflage security: Return standard 404 to hide the endpoint's existence
+  return res.status(404).send("Not Found");
 }
+
+// Block and camouflage traditional /login and /admin pathways
+app.use((req, res, next) => {
+  const p = req.path.toLowerCase().replace(/\/$/, "");
+  if (p === "/admin" || p === "/login") {
+    return res.status(404).send("Not Found");
+  }
+  next();
+});
 
 // 1. Google OAuth URL Request
 app.get("/api/auth/google/url", (req, res) => {
@@ -383,12 +458,15 @@ app.post("/api/auth/sandbox", (req, res) => {
   db.visitors.unshift(newVisitor);
   writeDb(db);
 
+  const registeredCustomer = db.registeredCustomers?.find(c => c.email.toLowerCase() === cleanEmail);
+
   res.json({
     email: cleanEmail,
-    name: cleanName,
-    picture: newVisitor.picture,
+    name: registeredCustomer ? `${registeredCustomer.firstName} ${registeredCustomer.secondName}` : cleanName,
+    picture: registeredCustomer?.picture || newVisitor.picture,
     role,
-    lang: managerLang
+    lang: managerLang,
+    details: registeredCustomer || undefined
   });
 });
 
@@ -432,12 +510,15 @@ app.post("/api/auth/firebase-login", (req, res) => {
   db.visitors.unshift(newVisitor);
   writeDb(db);
 
+  const registeredCustomer = db.registeredCustomers?.find(c => c.email.toLowerCase() === cleanEmail);
+
   res.json({
     email: cleanEmail,
-    name: cleanName,
-    picture: newVisitor.picture,
+    name: registeredCustomer ? `${registeredCustomer.firstName} ${registeredCustomer.secondName}` : cleanName,
+    picture: registeredCustomer?.picture || newVisitor.picture,
     role,
-    lang: managerLang
+    lang: managerLang,
+    details: registeredCustomer || undefined
   });
 });
 
@@ -531,8 +612,8 @@ app.post("/api/auth/manager-login", (req, res) => {
   });
 });
 
-// 4.5.5 Customer Registration with Gemini Face Validation
-async function validateProfilePictureWithGemini(base64DataUrl: string): Promise<{ isHumanFace: boolean; reason?: string }> {
+// 4.5.5 Customer Registration with Gemini Face Validation and Culinary Mood Analysis
+async function validateProfilePictureWithGemini(base64DataUrl: string): Promise<{ isHumanFace: boolean; reason?: string; aiAnalysis?: { culinaryMood: string; personalityAnalysis: string; recommendedDish: string } }> {
   try {
     const ai = getGeminiClient();
     if (!base64DataUrl) {
@@ -561,10 +642,29 @@ Criteria:
 - It must be a real photo of a human face (not a cartoon, not an avatar, not an object, not an animal).
 - The face and features must be clearly visible and recognizable (not heavily blurred, not extremely dark, not completely obscured, and not heavily filtered).
 
+Also, if it is a valid human face, perform a creative, warm, and highly delightful "Culinary Personality & Mood Analysis" (تحليل شخصية التذوق الباريسية) based on their facial features, smile, or expression. Match their facial vibe to one of our French Touch gourmet categories:
+- "Classic Gourmet Connoisseur" (عشاق الكلاسيكيات الراقية)
+- "Golden Crispy Adventurer" (مستكشف القرمشة الذهبية)
+- "Elegant Sweet Romantic" (ذواقة اللمسات الحلوة الراقية)
+- "Vibrant Energy Sensation" (عشاق الانتعاش والحيوية)
+
+Provide a highly customized and delightful 2-3 sentence paragraph in Arabic (personalityAnalysis) explaining how their facial features reflect their taste profile and giving them a warm gourmet welcome.
+Also recommend a dish from this list (recommendedDish) that fits their vibe:
+- "Classic French Touch Smash" (سماش برجر فرنش تاتش كلاسيك)
+- "Truffle Mushroom Smash" (سماش برجر المشروم والترفل الفاخر)
+- "Le Parisien Crispy Chicken Sandwich" (ساندوتش دجاج باريسيان المقرمش)
+- "French Touch Fries" (بطاطس فرنش تاتش بالجبنة والأعشاب)
+- "Artisanal Parisian Macarons" (ماكارون باريسي فاخر)
+
 You must respond STRICTLY with a JSON object in this format:
 {
   "isHumanFace": boolean,
-  "reason": "Explain in Arabic the reason if false, or leave empty if true"
+  "reason": "Explain in Arabic the reason if false, or leave empty if true",
+  "aiAnalysis": {
+    "culinaryMood": "Gourmet style name in Arabic (e.g. عشاق الكلاسيكيات الراقية)",
+    "personalityAnalysis": "2-3 sentences in Arabic with warm, personalized culinary vibes based on their smile/features",
+    "recommendedDish": "Name of the recommended dish from the list in Arabic"
+  }
 }
 
 Arabic examples of reasons:
@@ -584,13 +684,21 @@ Arabic examples of reasons:
     const result = JSON.parse(text);
     return {
       isHumanFace: !!result.isHumanFace,
-      reason: result.reason || "الصورة غير مطابقة للمواصفات المطلوبة لوجه بشري بملامح ظاهره."
+      reason: result.reason || "الصورة غير مطابقة للمواصفات المطلوبة لوجه بشري بملامح ظاهره.",
+      aiAnalysis: result.aiAnalysis || undefined
     };
   } catch (error: any) {
     console.error("Gemini face validation failed:", error);
     if (!process.env.GEMINI_API_KEY) {
       console.warn("GEMINI_API_KEY is missing. Profile picture auto-approved (simulated check).");
-      return { isHumanFace: true };
+      return { 
+        isHumanFace: true,
+        aiAnalysis: {
+          culinaryMood: "عشاق الكلاسيكيات الراقية",
+          personalityAnalysis: "نظراتك الثاقبة وملامحك الواثقة تدل على ذوق فرنسي رفيع يبحث عن النكهات المتوازنة والتفاصيل الفاخرة المتقنة.",
+          recommendedDish: "سماش برجر المشروم والترفل الفاخر"
+        }
+      };
     }
     return { isHumanFace: false, reason: "فشل التحقق الذكي من الصورة حالياً: " + error.message };
   }
@@ -608,6 +716,19 @@ function normalizeArabic(text: string): string {
 
 function cleanPhone(phone: string): string {
   return phone.replace(/\D/g, "");
+}
+
+function isEgyptianPhone(phone: string): boolean {
+  let cleaned = phone.replace(/\D/g, "");
+  // Normalize Egypt international prefixes
+  if (cleaned.startsWith("20") && cleaned.length === 12) {
+    cleaned = "0" + cleaned.substring(2);
+  } else if (cleaned.startsWith("0020") && cleaned.length === 14) {
+    cleaned = "0" + cleaned.substring(4);
+  } else if (cleaned.length === 10 && (cleaned.startsWith("10") || cleaned.startsWith("11") || cleaned.startsWith("12") || cleaned.startsWith("15"))) {
+    cleaned = "0" + cleaned;
+  }
+  return /^01[0125]\d{8}$/.test(cleaned);
 }
 
 async function checkSimilarityWithBlockedGemini(
@@ -702,6 +823,23 @@ app.post("/api/auth/register-customer", async (req, res) => {
     return res.status(400).json({ error: "جميع الحقول مطلوبة إجبارياً، بما في ذلك الاسم الثلاثي، الهواتف، البريد وصورة الحساب." });
   }
 
+  // Enforce Egyptian Mobile Number Verification
+  if (!isEgyptianPhone(phone)) {
+    return res.status(400).json({ 
+      error: "رقم الهاتف الأساسي غير صحيح! يجب إدخال رقم هاتف محمول مصري حقيقي نشط (مكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015)." 
+    });
+  }
+  if (!isEgyptianPhone(alternativePhone)) {
+    return res.status(400).json({ 
+      error: "رقم الهاتف الاحتياطي غير صحيح! يجب إدخال رقم هاتف محمول مصري حقيقي احتياطي مختلف (مكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015)." 
+    });
+  }
+  if (phone.replace(/\D/g, "") === alternativePhone.replace(/\D/g, "")) {
+    return res.status(400).json({ 
+      error: "رقم الهاتف الاحتياطي يجب أن يكون مختلفاً تماماً عن رقم الهاتف الأساسي لتسهيل التواصل والتحقق الفوري." 
+    });
+  }
+
   const cleanEmail = email.trim().toLowerCase();
   const db = readDb();
 
@@ -748,14 +886,14 @@ app.post("/api/auth/register-customer", async (req, res) => {
     return res.status(400).json({ error: "هذا البريد الإلكتروني مسجل بالفعل." });
   }
 
-  // Validate face
+  // Validate face & analyze personality
   const faceCheck = await validateProfilePictureWithGemini(picture);
   if (!faceCheck.isHumanFace) {
     return res.status(400).json({ error: faceCheck.reason });
   }
 
   // Add customer
-  const newCustomer: RegisteredCustomer = {
+  const newCustomer: RegisteredCustomer & { aiAnalysis?: any } = {
     firstName: firstName.trim(),
     secondName: secondName.trim(),
     thirdName: thirdName.trim(),
@@ -763,7 +901,12 @@ app.post("/api/auth/register-customer", async (req, res) => {
     alternativePhone: alternativePhone.trim(),
     email: cleanEmail,
     picture: picture,
-    registeredAt: new Date().toISOString()
+    registeredAt: new Date().toISOString(),
+    aiAnalysis: faceCheck.aiAnalysis || {
+      culinaryMood: "عشاق الكلاسيكيات الراقية",
+      personalityAnalysis: "نظراتك الثاقبة وملامحك الواثقة تدل على ذوق فرنسي رفيع يبحث عن النكهات المتوازنة والتفاصيل الفاخرة المتقنة.",
+      recommendedDish: "سماش برجر المشروم والترفل الفاخر"
+    }
   };
 
   if (!db.registeredCustomers) db.registeredCustomers = [];
@@ -823,6 +966,89 @@ app.post("/api/auth/register-customer", async (req, res) => {
       picture: picture,
       lang: "ar",
       details: newCustomer
+    }
+  });
+});
+
+// Endpoint for matching and fetching data of existing registered customers
+app.post("/api/auth/login-existing-customer", (req, res) => {
+  const { email, name, phone } = req.body;
+  if (!email || !name || !phone) {
+    return res.status(400).json({ error: "جميع الحقول مطلوبة للمطابقة: البريد الإلكتروني والاسم ورقم الهاتف." });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanEnteredPhone = cleanPhone(phone);
+  const normEnteredName = normalizeArabic(name);
+
+  const db = readDb();
+  const customers = db.registeredCustomers || [];
+
+  // Find the customer by email
+  const customer = customers.find(c => c.email.toLowerCase() === cleanEmail);
+  if (!customer) {
+    return res.status(404).json({ error: "لم يتم العثور على أي حساب مسجل بهذا البريد الإلكتروني. يرجى مراجعة البريد أو إنشاء حساب جديد." });
+  }
+
+  // Check if they are blocked
+  const blocked = db.blockedCustomers || [];
+  const isBlocked = blocked.some(b => b.email.trim().toLowerCase() === cleanEmail);
+  if (isBlocked) {
+    return res.status(403).json({ error: "تم حظر هذا الحساب نهائياً من قبل الإدارة لمخالفته القوانين والأنظمة." });
+  }
+
+  // Verify Phone match
+  const dbPhoneClean = cleanPhone(customer.phone);
+  const dbAltPhoneClean = cleanPhone(customer.alternativePhone);
+  if (cleanEnteredPhone !== dbPhoneClean && cleanEnteredPhone !== dbAltPhoneClean) {
+    return res.status(400).json({ error: "رقم الهاتف المدخل لا يتطابق مع الرقم الأساسي أو الاحتياطي المسجل لهذا الحساب." });
+  }
+
+  // Verify Name match (allow partial match for flexibility)
+  const dbFullName = `${customer.firstName} ${customer.secondName} ${customer.thirdName}`;
+  const normDbFullName = normalizeArabic(dbFullName);
+
+  const nameParts = normEnteredName.split(" ").filter(Boolean);
+  const isNameMatch = normDbFullName.includes(normEnteredName) || normEnteredName.includes(normalizeArabic(customer.firstName)) || nameParts.some(part => normDbFullName.includes(part));
+
+  if (!isNameMatch) {
+    return res.status(400).json({ error: "الاسم المدخل لا يتطابق مع الاسم المسجل للحساب." });
+  }
+
+  // Ensure they have an aiAnalysis
+  if (!customer.aiAnalysis) {
+    customer.aiAnalysis = {
+      culinaryMood: "عشاق الكلاسيكيات الراقية",
+      personalityAnalysis: "نظراتك الثاقبة وملامحك الواثقة تدل على ذوق فرنسي رفيع يبحث عن النكهات المتوازنة والتفاصيل الفاخرة المتقنة.",
+      recommendedDish: "سماش برجر المشروم والترفل الفاخر"
+    };
+    writeDb(db);
+  }
+
+  // Successful login, log them as a visitor
+  const newVisitor: Visitor = {
+    email: cleanEmail,
+    name: dbFullName,
+    picture: customer.picture,
+    timestamp: new Date().toISOString(),
+    ip: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1",
+    userAgent: req.headers["user-agent"] || "Customer Existing Login Flow",
+    authType: "sandbox",
+    role: "Customer"
+  };
+  if (!db.visitors) db.visitors = [];
+  db.visitors.unshift(newVisitor);
+  writeDb(db);
+
+  res.json({
+    success: true,
+    user: {
+      email: cleanEmail,
+      name: `${customer.firstName} ${customer.secondName}`,
+      role: "Customer",
+      picture: customer.picture,
+      lang: "ar",
+      details: customer
     }
   });
 });
@@ -1026,6 +1252,161 @@ app.put("/api/categories/:id", requireManagerOrDeveloper, (req, res) => {
   res.json({ success: true, categories: db.categories });
 });
 
+// 7.5. Products & Offers Endpoints with Smart Sync Restore
+app.get("/api/products", (req, res) => {
+  const db = readDb();
+  res.json(db.products || []);
+});
+
+app.post("/api/products", requireManagerOrDeveloper, (req, res) => {
+  const product = req.body;
+  if (!product || !product.id) {
+    return res.status(400).json({ error: "بيانات المنتج غير صالحة." });
+  }
+
+  const db = readDb();
+  if (!db.products) db.products = [];
+
+  const index = db.products.findIndex(p => p.id === product.id);
+  if (index !== -1) {
+    db.products[index] = product;
+  } else {
+    db.products.push(product);
+  }
+
+  writeDb(db);
+  res.json({ success: true, products: db.products });
+});
+
+app.delete("/api/products/:id", requireManagerOrDeveloper, (req, res) => {
+  const id = req.params.id;
+  const db = readDb();
+  if (!db.products) db.products = [];
+
+  db.products = db.products.filter(p => p.id !== id);
+  writeDb(db);
+  res.json({ success: true, products: db.products });
+});
+
+app.post("/api/products/delete-all", requireManagerOrDeveloper, (req, res) => {
+  const db = readDb();
+  db.products = [];
+  writeDb(db);
+  res.json({ success: true, products: [] });
+});
+
+app.post("/api/products/bulk-sync", requireManagerOrDeveloper, (req, res) => {
+  const { products } = req.body;
+  if (!Array.isArray(products)) {
+    return res.status(400).json({ error: "مصفوفة المنتجات مطلوبة للمزامنة." });
+  }
+  const db = readDb();
+  db.products = products;
+  writeDb(db);
+  res.json({ success: true, products: db.products });
+});
+
+app.get("/api/offers", (req, res) => {
+  const db = readDb();
+  res.json({
+    exclusiveOffer: db.exclusiveOffer || null,
+    weeklyOffers: db.weeklyOffers || []
+  });
+});
+
+app.post("/api/offers/exclusive", requireManagerOrDeveloper, (req, res) => {
+  const offer = req.body;
+  const db = readDb();
+  db.exclusiveOffer = offer;
+  writeDb(db);
+  res.json({ success: true, exclusiveOffer: db.exclusiveOffer });
+});
+
+app.post("/api/offers/weekly", requireManagerOrDeveloper, (req, res) => {
+  const { weeklyOffers } = req.body;
+  if (!Array.isArray(weeklyOffers)) {
+    return res.status(400).json({ error: "مصفوفة العروض الأسبوعية مطلوبة." });
+  }
+  const db = readDb();
+  db.weeklyOffers = weeklyOffers;
+  writeDb(db);
+  res.json({ success: true, weeklyOffers: db.weeklyOffers });
+});
+
+// Bulk database backup restore when server resets/updates
+app.post("/api/db/sync-restore", requireManagerOrDeveloper, (req, res) => {
+  const { products, categories, registeredCustomers, blockedCustomers, managers, subscribers, emailLogs, orderCounter } = req.body;
+  const db = readDb();
+
+  let restoredCount = 0;
+
+  if (products && Array.isArray(products) && products.length > 0) {
+    db.products = products;
+    restoredCount++;
+  }
+  if (categories && Array.isArray(categories) && categories.length > 0) {
+    db.categories = categories;
+    restoredCount++;
+  }
+  if (registeredCustomers && Array.isArray(registeredCustomers) && registeredCustomers.length > 0) {
+    const existingEmails = new Set((db.registeredCustomers || []).map(c => c.email.toLowerCase()));
+    db.registeredCustomers = db.registeredCustomers || [];
+    for (const cust of registeredCustomers) {
+      if (!existingEmails.has(cust.email.toLowerCase())) {
+        db.registeredCustomers.push(cust);
+      }
+    }
+    restoredCount++;
+  }
+  if (blockedCustomers && Array.isArray(blockedCustomers) && blockedCustomers.length > 0) {
+    const existingEmails = new Set((db.blockedCustomers || []).map(c => c.email.toLowerCase()));
+    db.blockedCustomers = db.blockedCustomers || [];
+    for (const cust of blockedCustomers) {
+      if (!existingEmails.has(cust.email.toLowerCase())) {
+        db.blockedCustomers.push(cust);
+      }
+    }
+    restoredCount++;
+  }
+  if (managers && Array.isArray(managers) && managers.length > 0) {
+    const existingEmails = new Set((db.managers || []).map(m => m.email.toLowerCase()));
+    db.managers = db.managers || [];
+    for (const mgr of managers) {
+      if (!existingEmails.has(mgr.email.toLowerCase())) {
+        db.managers.push(mgr);
+      }
+    }
+    restoredCount++;
+  }
+  if (subscribers && Array.isArray(subscribers) && subscribers.length > 0) {
+    const existingSubs = new Set((db.subscribers || []).map(s => s.toLowerCase()));
+    db.subscribers = db.subscribers || [];
+    for (const sub of subscribers) {
+      if (!existingSubs.has(sub.toLowerCase())) {
+        db.subscribers.push(sub);
+      }
+    }
+    restoredCount++;
+  }
+  if (emailLogs && Array.isArray(emailLogs) && emailLogs.length > 0) {
+    db.emailLogs = db.emailLogs || [];
+    const existingTimes = new Set(db.emailLogs.map(l => l.sentAt));
+    for (const log of emailLogs) {
+      if (!existingTimes.has(log.sentAt)) {
+        db.emailLogs.push(log);
+      }
+    }
+    restoredCount++;
+  }
+  if (typeof orderCounter === "number" && orderCounter > (db.orderCounter || 0)) {
+    db.orderCounter = orderCounter;
+    restoredCount++;
+  }
+
+  writeDb(db);
+  res.json({ success: true, message: `Successfully synced ${restoredCount} database tables to server.` });
+});
+
 // 8. Dynamic Translation API (using Gemini)
 app.post("/api/translate", async (req, res) => {
   const { text, targetLang } = req.body;
@@ -1070,6 +1451,402 @@ ${text}`,
   } catch (error: any) {
     console.error("Gemini Translation Error:", error);
     res.json({ translation: text }); // Fallback
+  }
+});
+
+// 8.5. Dynamic Translation to All Languages API (using Gemini)
+app.post("/api/translate-all", async (req, res) => {
+  const { text } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: "Missing text to translate" });
+  }
+
+  try {
+    if (!process.env.GEMINI_API_KEY) {
+      console.warn("GEMINI_API_KEY is missing, returning original text for all.");
+      return res.json({ ar: text, en: text, fr: text, it: text });
+    }
+
+    const ai = getGeminiClient();
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: `You are an expert multilingual culinary translator for a high-end gourmet restaurant/cafe. 
+Identify the language of the following text and translate it into Arabic (العربية), English, French (Français), and Italian (Italiano).
+
+Rules:
+- Keep a high-end, elegant gourmet restaurant/cafe tone.
+- Keep translations highly accurate, premium, authentic, and naturally phrased for each culture.
+- Return a JSON object with keys "ar", "en", "fr", "it".
+- The value for each key must be the translated text (or the original text if that key matches the source language).
+- Do not add any extra commentary, markdown, backticks, or code blocks outside the JSON itself.
+
+Text to translate:
+"${text}"`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            ar: { type: Type.STRING },
+            en: { type: Type.STRING },
+            fr: { type: Type.STRING },
+            it: { type: Type.STRING },
+          },
+          required: ["ar", "en", "fr", "it"]
+        }
+      }
+    });
+
+    const parsed = JSON.parse(response.text?.trim() || "{}");
+    res.json({
+      ar: parsed.ar || text,
+      en: parsed.en || text,
+      fr: parsed.fr || text,
+      it: parsed.it || text
+    });
+  } catch (error: any) {
+    console.error("Gemini Translate All Error:", error);
+    res.json({ ar: text, en: text, fr: text, it: text }); // Fallback
+  }
+});
+
+// --- Restaurant Reviews & Interactive Discussions ---
+app.get("/api/reviews", (req, res) => {
+  const db = readDb();
+  res.json(db.reviews || []);
+});
+
+app.post("/api/reviews", (req, res) => {
+  const { rating, comment, userEmail, userName, userPicture, role } = req.body;
+  if (!userEmail || !userName) {
+    return res.status(400).json({ error: "اسم المستخدم والبريد الإلكتروني مطلوبين لكتابة تقييم." });
+  }
+  const ratingNum = Number(rating);
+  if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+    return res.status(400).json({ error: "التقييم يجب أن يكون بين 1 و 5 نجوم." });
+  }
+
+  const db = readDb();
+  db.reviews = db.reviews || [];
+
+  const newReview: RestaurantReview = {
+    id: "rev_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+    userEmail,
+    userName,
+    userPicture: userPicture || "",
+    role: role || "Customer",
+    rating: ratingNum,
+    comment: comment || "",
+    createdAt: new Date().toISOString(),
+    replies: []
+  };
+
+  db.reviews.unshift(newReview);
+  writeDb(db);
+  res.json({ success: true, reviews: db.reviews });
+});
+
+app.post("/api/reviews/:id/replies", (req, res) => {
+  const reviewId = req.params.id;
+  const { text, userEmail, userName, userPicture, role } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: "نص الرد مطلوب." });
+  }
+  if (!userEmail || !userName) {
+    return res.status(400).json({ error: "بيانات المستخدم مطلوبة للمشاركة في المناقشة." });
+  }
+
+  const db = readDb();
+  db.reviews = db.reviews || [];
+
+  const review = db.reviews.find(r => r.id === reviewId);
+  if (!review) {
+    return res.status(404).json({ error: "التقييم غير موجود." });
+  }
+
+  const newReply: ReviewReply = {
+    id: "rep_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+    userEmail,
+    userName,
+    userPicture: userPicture || "",
+    role: role || "Customer",
+    text,
+    createdAt: new Date().toISOString()
+  };
+
+  review.replies.push(newReply);
+  writeDb(db);
+  res.json({ success: true, reviews: db.reviews });
+});
+
+app.delete("/api/reviews/:id", requireManagerOrDeveloper, (req, res) => {
+  const id = req.params.id;
+  const db = readDb();
+  db.reviews = db.reviews || [];
+  db.reviews = db.reviews.filter(r => r.id !== id);
+  writeDb(db);
+  res.json({ success: true, reviews: db.reviews });
+});
+
+app.delete("/api/reviews/:reviewId/replies/:replyId", requireManagerOrDeveloper, (req, res) => {
+  const { reviewId, replyId } = req.params;
+  const db = readDb();
+  db.reviews = db.reviews || [];
+  const review = db.reviews.find(r => r.id === reviewId);
+  if (review) {
+    review.replies = review.replies.filter(rep => rep.id !== replyId);
+    writeDb(db);
+  }
+  res.json({ success: true, reviews: db.reviews });
+});
+
+// --- AI Copilot for Managers and Developers ---
+app.post("/api/ai/copilot", requireManagerOrDeveloper, async (req, res) => {
+  const { prompt, currentLanguage } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ error: "الرجاء إدخال نص الطلب." });
+  }
+
+  const userRole = (req.headers["x-user-role"] as string || "").trim();
+  const isDeveloper = userRole === "Developer";
+
+  try {
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: "مفتاح الذكاء الاصطناعي غير متوفر حالياً على الخادم." });
+    }
+
+    const db = readDb();
+    const ai = getGeminiClient();
+
+    // Prepare a compact representation of the DB to avoid token bloat
+    const dbContext = {
+      products: (db.products || []).map(p => ({ id: p.id, name: p.name, price: p.price, category: p.category })),
+      categories: db.categories || [],
+      registeredCustomers: (db.registeredCustomers || []).map(c => ({ email: c.email, name: `${c.firstName || ""} ${c.secondName || ""} ${c.thirdName || ""}`.trim(), registeredAt: c.registeredAt, culinaryMood: c.aiAnalysis?.culinaryMood })),
+      blockedCustomers: (db.blockedCustomers || []).map(c => ({ email: c.email, name: `${c.firstName || ""} ${c.secondName || ""} ${c.thirdName || ""}`.trim() })),
+      exclusiveOffer: db.exclusiveOffer || null,
+      weeklyOffers: db.weeklyOffers || [],
+      reviews: (db.reviews || []).map(r => ({ id: r.id, email: r.userEmail, comment: r.comment, rating: r.rating, repliesCount: r.replies?.length })),
+      orderCounter: db.orderCounter || 0
+    };
+
+    let systemPrompt = "";
+    if (isDeveloper) {
+      systemPrompt = `You are the Master AI Copilot of French Touch Restaurant management portal.
+You have FULL control over the database and can modify products, offers, categories, customers, and reviews.
+The current language of the UI is ${currentLanguage || 'ar'}. Respond in this language in the "response" property of the JSON.
+
+You must parse the user's intent and decide if they want to execute an action or just ask a question.
+Return your answer as a JSON object with this exact schema:
+{
+  "response": "Explain what you did or answer the user's query in Arabic or English",
+  "actions": [
+    {
+      "type": "ADD_PRODUCT" | "DELETE_PRODUCT" | "SET_EXCLUSIVE_OFFER" | "SET_WEEKLY_OFFERS" | "BLOCK_CUSTOMER" | "UNBLOCK_CUSTOMER" | "DELETE_REVIEW",
+      "payload": { ... }
+    }
+  ]
+}
+
+Available Action Types and their Payloads:
+1. "ADD_PRODUCT"
+   Payload fields:
+   - "id": string (generate a random string like "prod_xxx" if not updating an existing product)
+   - "name": { "ar": "...", "en": "...", "fr": "...", "it": "..." } (Translate the product name into all 4 languages. DO NOT leave them empty!)
+   - "description": { "ar": "...", "en": "...", "fr": "...", "it": "..." } (Translate description into all 4 languages. DO NOT leave empty!)
+   - "price": number
+   - "category": string (must match one of the category IDs, e.g., "sandwiches", "meals", "pasta", "pizza", "dessert", "drinks", "exclusive")
+   - "image": string (use a high quality Unsplash image url matching the product, or fallback to "https://images.unsplash.com/photo-1546069901-ba9599a7e63c")
+   - "canHaveAddons": boolean
+   - "canHaveSauces": boolean
+
+2. "DELETE_PRODUCT"
+   Payload fields:
+   - "id": string (The ID of the product to delete)
+
+3. "SET_EXCLUSIVE_OFFER"
+   Payload fields:
+   - "id": "exc_1"
+   - "title": { "ar": "...", "en": "...", "fr": "...", "it": "..." } (translate into all 4)
+   - "description": { "ar": "...", "en": "...", "fr": "...", "it": "..." } (translate into all 4)
+   - "discount": string (e.g. "30% OFF")
+   - "endTime": string (e.g. ISO date or duration)
+   - "image": string
+   - "active": boolean
+
+4. "SET_WEEKLY_OFFERS"
+   Payload: Array of 7 weekly offers corresponding to dayOfWeek 0-6. Update the relevant day or days requested.
+
+5. "BLOCK_CUSTOMER"
+   Payload fields:
+   - "email": string (Customer's email address)
+
+6. "UNBLOCK_CUSTOMER"
+   Payload fields:
+   - "email": string (Customer's email address)
+
+7. "DELETE_REVIEW"
+   Payload fields:
+   - "id": string (Review ID to delete)
+
+Rules:
+- If asked to add/update an offer or product, always translate the Arabic inputs to English, French, and Italian so the multi-language UI works perfectly!
+- If the user asks a question or requests information (e.g. 'من هو العميل uv...؟' or 'كم زبون مسجل؟'), return an empty "actions" array and provide the perfect detailed answer in the "response" text.
+- Be extremely polite, professional, and helpful.
+
+Current Database State:
+${JSON.stringify(dbContext, null, 2)}`;
+    } else {
+      systemPrompt = `You are the LIMITED Manager AI Copilot of French Touch Restaurant management portal.
+**CRITICAL LIMITATION**: You are ONLY authorized to manage products (add, edit, delete), categories, and offers (exclusive/weekly), or delete inappropriate reviews.
+You are STRICTLY FORBIDDEN from blocking or unblocking customers, managing developer settings, accessing developer statistics, viewing internal logs, or performing any developer-level operations.
+
+The current language of the UI is ${currentLanguage || 'ar'}. Respond in this language in the "response" property of the JSON.
+
+You must parse the user's intent and decide if they want to execute an action or just ask a question.
+Return your answer as a JSON object with this exact schema:
+{
+  "response": "Explain what you did or answer the user's query in Arabic or English",
+  "actions": [
+    {
+      "type": "ADD_PRODUCT" | "DELETE_PRODUCT" | "SET_EXCLUSIVE_OFFER" | "SET_WEEKLY_OFFERS" | "DELETE_REVIEW",
+      "payload": { ... }
+    }
+  ]
+}
+
+Available Action Types and their Payloads for Managers:
+1. "ADD_PRODUCT"
+   Payload fields:
+   - "id": string (generate a random string like "prod_xxx" if not updating an existing product)
+   - "name": { "ar": "...", "en": "...", "fr": "...", "it": "..." } (Translate the product name into all 4 languages. DO NOT leave them empty!)
+   - "description": { "ar": "...", "en": "...", "fr": "...", "it": "..." } (Translate description into all 4 languages. DO NOT leave empty!)
+   - "price": number
+   - "category": string (must match one of the category IDs, e.g., "sandwiches", "meals", "pasta", "pizza", "dessert", "drinks", "exclusive")
+   - "image": string (use a high quality Unsplash image url matching the product, or fallback to "https://images.unsplash.com/photo-1546069901-ba9599a7e63c")
+   - "canHaveAddons": boolean
+   - "canHaveSauces": boolean
+
+2. "DELETE_PRODUCT"
+   Payload fields:
+   - "id": string (The ID of the product to delete)
+
+3. "SET_EXCLUSIVE_OFFER"
+   Payload fields:
+   - "id": "exc_1"
+   - "title": { "ar": "...", "en": "...", "fr": "...", "it": "..." } (translate into all 4)
+   - "description": { "ar": "...", "en": "...", "fr": "...", "it": "..." } (translate into all 4)
+   - "discount": string (e.g. "30% OFF")
+   - "endTime": string (e.g. ISO date or duration)
+   - "image": string
+   - "active": boolean
+
+4. "SET_WEEKLY_OFFERS"
+   Payload: Array of 7 weekly offers corresponding to dayOfWeek 0-6. Update the relevant day or days requested.
+
+5. "DELETE_REVIEW"
+   Payload fields:
+   - "id": string (Review ID to delete)
+
+Rules & Absolute Limitations for Managers:
+- If the user asks you to block/unblock a customer, block an email, or perform developer tasks, you MUST refuse and state that you do not have the authorization to perform customer blocking or developer operations as a Manager, and that this permission is restricted exclusively to the Developer.
+- If asked to add/update an offer or product, always translate the Arabic inputs to English, French, and Italian so the multi-language UI works perfectly!
+- If the user asks a question or requests information, return an empty "actions" array and provide the perfect detailed answer in the "response" text.
+- Be extremely polite, professional, and helpful.
+
+Current Database State (Manager view - Limited):
+${JSON.stringify(dbContext, null, 2)}`;
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: "application/json"
+      }
+    });
+
+    const aiResult = JSON.parse(response.text?.trim() || "{}");
+    const actions = aiResult.actions || [];
+    let updated = false;
+
+    // Execute actions on real database
+    for (const action of actions) {
+      if ((action.type === "BLOCK_CUSTOMER" || action.type === "UNBLOCK_CUSTOMER") && !isDeveloper) {
+        return res.status(403).json({ error: "عذراً، بصفتك مديراً، لا تملك صلاحية حظر أو إلغاء حظر العملاء. هذه الصلاحية حصرية للمطور فقط." });
+      }
+
+      if (action.type === "ADD_PRODUCT" && action.payload) {
+        if (!db.products) db.products = [];
+        const index = db.products.findIndex(p => p.id === action.payload.id);
+        if (index !== -1) {
+          db.products[index] = { ...db.products[index], ...action.payload };
+        } else {
+          db.products.push(action.payload);
+        }
+        updated = true;
+      } else if (action.type === "DELETE_PRODUCT" && action.payload?.id) {
+        if (db.products) {
+          db.products = db.products.filter(p => p.id !== action.payload.id);
+          updated = true;
+        }
+      } else if (action.type === "SET_EXCLUSIVE_OFFER" && action.payload) {
+        db.exclusiveOffer = action.payload;
+        updated = true;
+      } else if (action.type === "SET_WEEKLY_OFFERS" && Array.isArray(action.payload)) {
+        db.weeklyOffers = action.payload;
+        updated = true;
+      } else if (action.type === "BLOCK_CUSTOMER" && action.payload?.email) {
+        const targetEmail = action.payload.email.toLowerCase().trim();
+        const customer = db.registeredCustomers?.find(c => c.email.toLowerCase().trim() === targetEmail);
+        if (customer) {
+          db.blockedCustomers = db.blockedCustomers || [];
+          if (!db.blockedCustomers.some(c => c.email.toLowerCase().trim() === targetEmail)) {
+            db.blockedCustomers.push(customer);
+          }
+          db.registeredCustomers = db.registeredCustomers?.filter(c => c.email.toLowerCase().trim() !== targetEmail);
+          updated = true;
+        }
+      } else if (action.type === "UNBLOCK_CUSTOMER" && action.payload?.email) {
+        const targetEmail = action.payload.email.toLowerCase().trim();
+        const blocked = db.blockedCustomers?.find(c => c.email.toLowerCase().trim() === targetEmail);
+        if (blocked) {
+          db.registeredCustomers = db.registeredCustomers || [];
+          if (!db.registeredCustomers.some(c => c.email.toLowerCase().trim() === targetEmail)) {
+            db.registeredCustomers.push(blocked);
+          }
+          db.blockedCustomers = db.blockedCustomers?.filter(c => c.email.toLowerCase().trim() !== targetEmail);
+          updated = true;
+        }
+      } else if (action.type === "DELETE_REVIEW" && action.payload?.id) {
+        if (db.reviews) {
+          db.reviews = db.reviews.filter(r => r.id !== action.payload.id);
+          updated = true;
+        }
+      }
+    }
+
+    if (updated) {
+      writeDb(db);
+    }
+
+    res.json({
+      success: true,
+      response: aiResult.response || "تم تنفيذ الطلب بنجاح.",
+      actionsExecuted: actions,
+      dbProducts: db.products || [],
+      dbCategories: db.categories || [],
+      dbExclusiveOffer: db.exclusiveOffer || null,
+      dbWeeklyOffers: db.weeklyOffers || [],
+      dbReviews: db.reviews || [],
+      dbRegisteredCustomers: db.registeredCustomers || [],
+      dbBlockedCustomers: db.blockedCustomers || []
+    });
+
+  } catch (error: any) {
+    console.error("AI Copilot Error:", error);
+    res.status(500).json({ error: "حدث خطأ في معالجة طلب الذكاء الاصطناعي: " + error.message });
   }
 });
 

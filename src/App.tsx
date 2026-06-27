@@ -3,7 +3,7 @@ import {
   Globe, User, LogOut, Lock, Calendar, MapPin, 
   Clock, Phone, Sparkles, Compass, Eye, ShieldAlert, CheckCircle2, Ticket,
   ShoppingBag, Plus, Minus, Trash2, LayoutDashboard, Utensils, Map,
-  ChevronRight, ArrowRight, Star, Heart
+  ChevronRight, ArrowRight, Star, Heart, MessageSquare
 } from 'lucide-react';
 
 import { 
@@ -21,12 +21,15 @@ import MenuSection from './components/MenuSection';
 import ExclusiveOfferBanner from './components/ExclusiveOfferBanner';
 import AdminManagerConsole from './components/AdminManagerConsole';
 import LoginModal from './components/LoginModal';
+import PortalLogin from './components/PortalLogin';
 import SubscriptionModal from './components/SubscriptionModal';
 import RestaurantLogo from './components/RestaurantLogo';
 import LanguageLandingScreen from './components/LanguageLandingScreen';
 import GoogleLoginScreen from './components/GoogleLoginScreen';
 import DeveloperConsole from './components/DeveloperConsole';
 import ProductCustomizerModal from './components/ProductCustomizerModal';
+import ReviewsDiscussion from './components/ReviewsDiscussion';
+import AICopilotConsole from './components/AICopilotConsole';
 import { CustomizeOption } from './types';
 
 const safeStorage = {
@@ -169,7 +172,7 @@ export default function App() {
   }, [previewRole]);
 
   // --- App-style Navigation State ---
-  const [activeAppTab, setActiveAppTab] = useState<'dashboard' | 'menu' | 'reserve' | 'offers' | 'locations' | 'admin' | 'account'>('menu');
+  const [activeAppTab, setActiveAppTab] = useState<'dashboard' | 'menu' | 'reserve' | 'offers' | 'locations' | 'admin' | 'account' | 'reviews'>('menu');
 
   // --- Interactive Simulated Order Bag/Cart State ---
   const [cart, setCart] = useState<{ id: string; product: Product; quantity: number; selectedAddons?: CustomizeOption[]; selectedSauces?: CustomizeOption[] }[]>([]);
@@ -182,8 +185,21 @@ export default function App() {
 
   // --- UI Controls ---
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSecretPortal, setIsSecretPortal] = useState(() => {
+    const path = window.location.pathname.toLowerCase().replace(/\/$/, "");
+    return path === "/portal-xyz987";
+  });
+
+  useEffect(() => {
+    const handleLocationCheck = () => {
+      const path = window.location.pathname.toLowerCase().replace(/\/$/, "");
+      setIsSecretPortal(path === "/portal-xyz987");
+    };
+    window.addEventListener('popstate', handleLocationCheck);
+    return () => window.removeEventListener('popstate', handleLocationCheck);
+  }, []);
   const [isAdminConsoleVisible, setIsAdminConsoleVisible] = useState(false);
-  const [adminActiveTab, setAdminActiveTab] = useState<'products' | 'offers' | 'super'>('products');
+  const [adminActiveTab, setAdminActiveTab] = useState<'products' | 'offers' | 'super' | 'copilot' | 'reviews'>('products');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // --- Customer Registration State ---
@@ -198,6 +214,25 @@ export default function App() {
   const [regError, setRegError] = useState('');
   const [regSuccess, setRegSuccess] = useState(false);
 
+  // Existing Customer Login / Account Retrieval State
+  const [authFormTab, setAuthFormTab] = useState<'register' | 'login'>('register');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginName, setLoginName] = useState('');
+  const [loginPhone, setLoginPhone] = useState('');
+
+  // Helper to validate Egyptian Mobile Phone Format
+  const checkEgyptianPhone = (num: string): boolean => {
+    let cleaned = num.replace(/\D/g, "");
+    if (cleaned.startsWith("20") && cleaned.length === 12) {
+      cleaned = "0" + cleaned.substring(2);
+    } else if (cleaned.startsWith("0020") && cleaned.length === 14) {
+      cleaned = "0" + cleaned.substring(4);
+    } else if (cleaned.length === 10 && (cleaned.startsWith("10") || cleaned.startsWith("11") || cleaned.startsWith("12") || cleaned.startsWith("15"))) {
+      cleaned = "0" + cleaned;
+    }
+    return /^01[0125]\d{8}$/.test(cleaned);
+  };
+
   // --- New Checkout Flow States ---
   const [pendingCheckout, setPendingCheckout] = useState(false);
   const [isCheckoutDetailsOpen, setIsCheckoutDetailsOpen] = useState(false);
@@ -209,23 +244,7 @@ export default function App() {
   const [currentOrderNumber, setCurrentOrderNumber] = useState<number | null>(null);
 
   // --- Secret Portal Logic ---
-  const [logoClicks, setLogoClicks] = useState(0);
-  const [lastLogoClick, setLastLogoClick] = useState(0);
-
   const handleLogoClick = () => {
-    const now = Date.now();
-    if (now - lastLogoClick < 3000) {
-      const newClicks = logoClicks + 1;
-      setLogoClicks(newClicks);
-      if (newClicks >= 5) {
-        setIsLoginModalOpen(true);
-        setLogoClicks(0);
-        console.log('Secret Login Modal Unlocked!');
-      }
-    } else {
-      setLogoClicks(1);
-    }
-    setLastLogoClick(now);
     setActiveAppTab('menu');
   };
 
@@ -248,6 +267,26 @@ export default function App() {
     document.documentElement.dir = currentLangDir;
     document.documentElement.lang = currentLang;
   }, [currentLang, currentLangDir]);
+
+  // --- Fetch Unique Order Number Effect ---
+  useEffect(() => {
+    const fetchOrderNum = async () => {
+      if (isCheckoutDetailsOpen && currentUser && !currentOrderNumber) {
+        try {
+          const res = await fetch("/api/orders/next-number", { method: "POST" });
+          if (res.ok) {
+            const data = await res.json();
+            setCurrentOrderNumber(data.orderNumber);
+          } else {
+            setCurrentOrderNumber(Math.floor(Date.now() / 1000) - 1770000000);
+          }
+        } catch (err) {
+          setCurrentOrderNumber(Math.floor(Date.now() / 1000) - 1770000000);
+        }
+      }
+    };
+    fetchOrderNum();
+  }, [isCheckoutDetailsOpen, currentUser, currentOrderNumber]);
 
   // Increment page views once on mount
   useEffect(() => {
@@ -310,19 +349,170 @@ export default function App() {
 
   useEffect(() => {
     safeStorage.setItem('frenchtouch_products', JSON.stringify(products));
+    safeStorage.setItem('frenchtouch_products_backup', JSON.stringify(products));
   }, [products]);
 
   useEffect(() => {
     safeStorage.setItem('frenchtouch_exclusive', JSON.stringify(exclusiveOffer));
+    safeStorage.setItem('frenchtouch_exclusive_backup', JSON.stringify(exclusiveOffer));
   }, [exclusiveOffer]);
 
   useEffect(() => {
     safeStorage.setItem('frenchtouch_weekly', JSON.stringify(weeklyOffers));
+    safeStorage.setItem('frenchtouch_weekly_backup', JSON.stringify(weeklyOffers));
   }, [weeklyOffers]);
 
   useEffect(() => {
     safeStorage.setItem('frenchtouch_managers', JSON.stringify(managers));
+    safeStorage.setItem('frenchtouch_managers_backup', JSON.stringify(managers));
   }, [managers]);
+
+  // Load products and offers from server-side database on startup
+  useEffect(() => {
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setProducts(data);
+          safeStorage.setItem('frenchtouch_products_backup', JSON.stringify(data));
+        } else {
+          // If server was empty, try to populate from our active products to seed the server
+          const activeProducts = products;
+          if (activeProducts && activeProducts.length > 0 && currentUser && (currentUser.role === 'Manager' || currentUser.role === 'Developer')) {
+            fetch('/api/products/bulk-sync', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-user-email': currentUser.email,
+                'x-user-role': currentUser.role
+              },
+              body: JSON.stringify({ products: activeProducts })
+            }).catch(e => console.warn('Failed auto-seeding products on server:', e));
+          }
+        }
+      })
+      .catch(err => console.warn('Failed to fetch products from server:', err));
+
+    fetch('/api/offers')
+      .then(res => res.json())
+      .then(data => {
+        if (data) {
+          if (data.exclusiveOffer) {
+            setExclusiveOffer(data.exclusiveOffer);
+            safeStorage.setItem('frenchtouch_exclusive_backup', JSON.stringify(data.exclusiveOffer));
+          }
+          if (Array.isArray(data.weeklyOffers) && data.weeklyOffers.length > 0) {
+            setWeeklyOffers(data.weeklyOffers);
+            safeStorage.setItem('frenchtouch_weekly_backup', JSON.stringify(data.weeklyOffers));
+          }
+        }
+      })
+      .catch(err => console.warn('Failed to fetch offers from server:', err));
+  }, []);
+
+  // Self-Healing Sync Engine: Automatically restore products, categories, registered customers and settings if server resets
+  useEffect(() => {
+    if (!currentUser || (currentUser.role !== 'Manager' && currentUser.role !== 'Developer')) return;
+
+    const performDatabaseCheckAndRestore = async () => {
+      try {
+        // Fetch server products
+        const productsRes = await fetch('/api/products');
+        const serverProducts = await productsRes.json();
+
+        // Fetch server categories
+        const categoriesRes = await fetch('/api/categories');
+        const serverCategories = await categoriesRes.json();
+
+        // Fetch server registered customers
+        const customersRes = await fetch('/api/registered-customers', {
+          headers: {
+            'x-user-email': currentUser.email,
+            'x-user-role': currentUser.role
+          }
+        });
+        const serverCustomers = await customersRes.json();
+
+        const localProductsSaved = safeStorage.getItem('frenchtouch_products_backup') || safeStorage.getItem('frenchtouch_products');
+        const localCategoriesSaved = safeStorage.getItem('frenchtouch_categories_backup');
+        const localCustomersSaved = safeStorage.getItem('frenchtouch_customers_backup');
+        const localManagersSaved = safeStorage.getItem('frenchtouch_managers_backup') || safeStorage.getItem('frenchtouch_managers');
+        const localWeeklyOffersSaved = safeStorage.getItem('frenchtouch_weekly_backup') || safeStorage.getItem('frenchtouch_weekly');
+        const localExclusiveOfferSaved = safeStorage.getItem('frenchtouch_exclusive_backup') || safeStorage.getItem('frenchtouch_exclusive');
+
+        let restorePayload: any = {};
+        let needsRestore = false;
+
+        if ((!Array.isArray(serverProducts) || serverProducts.length === 0) && localProductsSaved) {
+          const parsed = JSON.parse(localProductsSaved);
+          if (parsed && parsed.length > 0) {
+            restorePayload.products = parsed;
+            needsRestore = true;
+          }
+        }
+
+        if ((!Array.isArray(serverCategories) || serverCategories.length <= 4) && localCategoriesSaved) {
+          const parsed = JSON.parse(localCategoriesSaved);
+          if (parsed && parsed.length > 4) {
+            restorePayload.categories = parsed;
+            needsRestore = true;
+          }
+        }
+
+        if ((!Array.isArray(serverCustomers) || serverCustomers.length === 0) && localCustomersSaved) {
+          const parsed = JSON.parse(localCustomersSaved);
+          if (parsed && parsed.length > 0) {
+            restorePayload.registeredCustomers = parsed;
+            needsRestore = true;
+          }
+        }
+
+        if (needsRestore) {
+          console.log("Auto-Restore Engine: Server reset or update detected. Restoring data from browser backup...");
+
+          const restoreRes = await fetch('/api/db/sync-restore', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-email': currentUser.email,
+              'x-user-role': currentUser.role
+            },
+            body: JSON.stringify(restorePayload)
+          });
+
+          if (restoreRes.ok) {
+            console.log("Auto-Restore Engine: Data restored successfully!");
+            if (restorePayload.products) setProducts(restorePayload.products);
+            if (restorePayload.categories) setCategories(restorePayload.categories);
+
+            alert(currentLang === 'ar'
+              ? "🔄 نظام المزامنة الفرنسي الذكي: تم الكشف عن تحديث للنظام أو إعادة تعيين الاستضافة. تم استعادة جميع المنتجات، الأقسام، والحسابات المحفوظة من متصفحك تلقائياً دون أي فقدان للبيانات!"
+              : "🔄 Gourmet Smart Sync System: Server update or hosting reset detected. Restored all saved products, categories, and accounts from your browser backup instantly!"
+            );
+          }
+        } else {
+          // Live server has valid data, back them up in local storage to keep sync updated!
+          if (Array.isArray(serverProducts) && serverProducts.length > 0) {
+            safeStorage.setItem('frenchtouch_products_backup', JSON.stringify(serverProducts));
+          }
+          if (Array.isArray(serverCategories) && serverCategories.length > 0) {
+            safeStorage.setItem('frenchtouch_categories_backup', JSON.stringify(serverCategories));
+          }
+          if (Array.isArray(serverCustomers) && serverCustomers.length > 0) {
+            safeStorage.setItem('frenchtouch_customers_backup', JSON.stringify(serverCustomers));
+          }
+        }
+      } catch (e) {
+        console.warn("Auto-Restore Engine error:", e);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      performDatabaseCheckAndRestore();
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [currentUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -372,6 +562,7 @@ export default function App() {
         setActiveAppTab('menu');
         setIsCartOpen(true);
         setIsCheckoutDetailsOpen(true);
+        setPendingCheckout(false);
       } else {
         setActiveAppTab('menu');
       }
@@ -383,6 +574,8 @@ export default function App() {
     setPreviewRole('Developer');
     setIsAdminConsoleVisible(false);
     setActiveAppTab('menu');
+    setIsSecretPortal(false);
+    window.history.pushState({}, '', '/');
   };
 
   // --- Action Handlers ---
@@ -432,23 +625,95 @@ export default function App() {
     }
   };
 
-  const handleSaveProduct = (product: Product) => {
-    const exists = products.some(p => p.id === product.id);
-    if (exists) {
-      setProducts(products.map(p => p.id === product.id ? product : p));
-    } else {
-      setProducts([product, ...products]);
+  const handleDatabaseMutated = (updatedData: {
+    products?: any[];
+    exclusiveOffer?: any;
+    weeklyOffers?: any[];
+  }) => {
+    if (updatedData.products) {
+      setProducts(updatedData.products);
+      safeStorage.setItem('frenchtouch_products', JSON.stringify(updatedData.products));
+      safeStorage.setItem('frenchtouch_products_backup', JSON.stringify(updatedData.products));
+    }
+    if (updatedData.exclusiveOffer) {
+      setExclusiveOffer(updatedData.exclusiveOffer);
+      safeStorage.setItem('frenchtouch_exclusive', JSON.stringify(updatedData.exclusiveOffer));
+      safeStorage.setItem('frenchtouch_exclusive_backup', JSON.stringify(updatedData.exclusiveOffer));
+    }
+    if (updatedData.weeklyOffers) {
+      setWeeklyOffers(updatedData.weeklyOffers);
+      safeStorage.setItem('frenchtouch_weekly', JSON.stringify(updatedData.weeklyOffers));
+      safeStorage.setItem('frenchtouch_weekly_backup', JSON.stringify(updatedData.weeklyOffers));
     }
   };
 
-  const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter(p => p.id !== id));
-    setCart(cart.filter(item => item.product.id !== id));
+  const handleSaveProduct = async (product: Product) => {
+    const exists = products.some(p => p.id === product.id);
+    let newProducts = [];
+    if (exists) {
+      newProducts = products.map(p => p.id === product.id ? product : p);
+    } else {
+      newProducts = [product, ...products];
+    }
+    setProducts(newProducts);
+    safeStorage.setItem('frenchtouch_products_backup', JSON.stringify(newProducts));
+
+    if (currentUser?.role === 'Manager' || currentUser?.role === 'Developer') {
+      try {
+        await fetch('/api/products', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-email': currentUser.email,
+            'x-user-role': currentUser.role
+          },
+          body: JSON.stringify(product)
+        });
+      } catch (err) {
+        console.warn('Failed to save product on server:', err);
+      }
+    }
   };
 
-  const handleDeleteAllProducts = () => {
+  const handleDeleteProduct = async (id: string) => {
+    const newProducts = products.filter(p => p.id !== id);
+    setProducts(newProducts);
+    setCart(cart.filter(item => item.product.id !== id));
+    safeStorage.setItem('frenchtouch_products_backup', JSON.stringify(newProducts));
+
+    if (currentUser?.role === 'Manager' || currentUser?.role === 'Developer') {
+      try {
+        await fetch(`/api/products/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: {
+            'x-user-email': currentUser.email,
+            'x-user-role': currentUser.role
+          }
+        });
+      } catch (err) {
+        console.warn('Failed to delete product from server:', err);
+      }
+    }
+  };
+
+  const handleDeleteAllProducts = async () => {
     setProducts([]);
     setCart([]);
+    safeStorage.setItem('frenchtouch_products_backup', JSON.stringify([]));
+
+    if (currentUser?.role === 'Manager' || currentUser?.role === 'Developer') {
+      try {
+        await fetch('/api/products/delete-all', {
+          method: 'POST',
+          headers: {
+            'x-user-email': currentUser.email,
+            'x-user-role': currentUser.role
+          }
+        });
+      } catch (err) {
+        console.warn('Failed to delete all products on server:', err);
+      }
+    }
   };
 
   const handleAddCategory = async (id: string, name: any, icon?: string): Promise<{ success: boolean; error?: string }> => {
@@ -512,12 +777,46 @@ export default function App() {
     }
   };
 
-  const handleSaveExclusiveOffer = (offer: ExclusiveOffer) => {
+  const handleSaveExclusiveOffer = async (offer: ExclusiveOffer) => {
     setExclusiveOffer(offer);
+    safeStorage.setItem('frenchtouch_exclusive_backup', JSON.stringify(offer));
+
+    if (currentUser?.role === 'Manager' || currentUser?.role === 'Developer') {
+      try {
+        await fetch('/api/offers/exclusive', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-email': currentUser.email,
+            'x-user-role': currentUser.role
+          },
+          body: JSON.stringify(offer)
+        });
+      } catch (err) {
+        console.warn('Failed to save exclusive offer to server:', err);
+      }
+    }
   };
 
-  const handleSaveWeeklyOffers = (offers: WeeklyOffer[]) => {
+  const handleSaveWeeklyOffers = async (offers: WeeklyOffer[]) => {
     setWeeklyOffers(offers);
+    safeStorage.setItem('frenchtouch_weekly_backup', JSON.stringify(offers));
+
+    if (currentUser?.role === 'Manager' || currentUser?.role === 'Developer') {
+      try {
+        await fetch('/api/offers/weekly', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-email': currentUser.email,
+            'x-user-role': currentUser.role
+          },
+          body: JSON.stringify({ weeklyOffers: offers })
+        });
+      } catch (err) {
+        console.warn('Failed to save weekly offers to server:', err);
+      }
+    }
   };
 
   // --- Booking Table Submission ---
@@ -758,6 +1057,21 @@ ${itemsList}
     }
   };
 
+  // If on the secret portal route and not logged in as Manager or Developer, display PortalLogin
+  if (isSecretPortal && (!currentUser || (currentUser.role !== 'Developer' && currentUser.role !== 'Manager'))) {
+    return (
+      <PortalLogin
+        currentLang={currentLang}
+        onLoginSuccess={(email, name, role, lang) => {
+          handleLoginSuccess({ email, name, role, lang });
+          // Redirect the path back to "/" in browser bar for secrecy
+          window.history.pushState({}, '', '/');
+          setIsSecretPortal(false);
+        }}
+      />
+    );
+  }
+
   if (!entered && currentUser?.role !== 'Manager') {
     return (
       <LanguageLandingScreen
@@ -772,7 +1086,7 @@ ${itemsList}
 
 
   // Developer Command Center view
-  if (currentUser?.role === 'Developer') {
+  if (currentUser?.role === 'Developer' && previewRole === 'Developer') {
     return (
       <DeveloperConsole
         currentLang={currentLang}
@@ -780,6 +1094,7 @@ ${itemsList}
         onLogout={handleLogout}
         previewRole={previewRole}
         setPreviewRole={setPreviewRole}
+        onDatabaseMutated={handleDatabaseMutated}
       />
     );
   }
@@ -1012,19 +1327,6 @@ ${itemsList}
               </button>
 
               <button
-                onClick={() => { setActiveAppTab('reserve'); setIsAdminConsoleVisible(false); }}
-                id="tab-btn-reserve"
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold transition-all transform active:scale-98 cursor-pointer ${
-                  activeAppTab === 'reserve'
-                    ? 'bg-brand-blue text-[#FDFBF7] shadow-md shadow-brand-blue/15'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Ticket className="w-4.5 h-4.5 text-brand-gold" />
-                <span>{t.reserveTable}</span>
-              </button>
-
-              <button
                 onClick={() => { setActiveAppTab('offers'); setIsAdminConsoleVisible(false); }}
                 id="tab-btn-offers"
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold transition-all transform active:scale-98 cursor-pointer ${
@@ -1048,6 +1350,19 @@ ${itemsList}
               >
                 <Map className="w-4.5 h-4.5 text-brand-gold" />
                 <span>{t.branches}</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveAppTab('reviews'); setIsAdminConsoleVisible(false); }}
+                id="tab-btn-reviews"
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-xs font-bold transition-all transform active:scale-98 cursor-pointer ${
+                  activeAppTab === 'reviews'
+                    ? 'bg-brand-blue text-[#FDFBF7] shadow-md shadow-brand-blue/15'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <MessageSquare className="w-4.5 h-4.5 text-brand-gold" />
+                <span>{currentLang === 'ar' ? 'التقييمات والمناقشات' : 'Reviews & Discussions'}</span>
               </button>
 
               <button
@@ -1149,12 +1464,6 @@ ${itemsList}
                         className="px-4 py-2 bg-[#FDFBF7] text-brand-blue font-bold rounded-xl text-xs shadow-md hover:bg-amber-100 transition-colors cursor-pointer"
                       >
                         {t.viewMenuBtn}
-                      </button>
-                      <button
-                        onClick={() => setActiveAppTab('reserve')}
-                        className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-brand-blue font-bold rounded-xl text-xs shadow-md transition-all cursor-pointer"
-                      >
-                        {t.reserveTable}
                       </button>
                     </div>
                   </div>
@@ -1447,156 +1756,6 @@ ${itemsList}
               </div>
             )}
 
-            {/* RESERVATION VIEW */}
-            {activeAppTab === 'reserve' && (
-              <div className="space-y-8">
-                <div>
-                  <h2 className="serif-heading text-2xl md:text-3xl font-extrabold text-brand-blue">
-                    {t.reserveTable}
-                  </h2>
-                  <p className="text-gray-500 text-xs mt-1">
-                    {currentLang === 'ar' 
-                      ? 'احجز مقعدك الفخم لتناول العشاء في أي فرع من فروع القاهرة بخطوات فورية وتذكرة سفر معتمدة.'
-                      : 'Book your luxury seat directly in our Cairo branches and obtain your instant VIP ticket.'}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                  
-                  {/* Explanation card */}
-                  <div className="lg:col-span-5 space-y-6">
-                    <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl space-y-4">
-                      <span className="inline-flex items-center gap-1.5 bg-brand-blue/5 text-brand-blue font-bold px-3 py-1 rounded-full text-[10px] uppercase">
-                        <Ticket className="w-3.5 h-3.5 text-brand-gold" />
-                        {currentLang === 'ar' ? 'حجوزات فورية معتمدة' : 'Instant Web Pass'}
-                      </span>
-                      <h3 className="serif-heading text-xl font-bold text-brand-blue">
-                        {currentLang === 'ar' ? 'آلية الحجز الرقمية' : 'Digital Seating Ticket'}
-                      </h3>
-                      <p className="text-xs text-gray-500 leading-relaxed">
-                        {currentLang === 'ar' 
-                          ? 'بمجرد ملء الاستمارة بالمعلومات المطلوبة، يقوم نظام المطعم بحجز الطاولة الخاصة بك فورياً وإصدار تذكرة سفر إلكترونية رسمية لتظهرها للمضيف عند الوصول.'
-                          : 'Upon submitting the form, your table is automatically blocked in the chosen lounge. A digital travel docket ticket will be generated instantly.'}
-                      </p>
-                    </div>
-
-                    {/* Confirmed Ticket Pass */}
-                    {bookingReceipt && (
-                      <div className="p-5 bg-amber-500/5 border-2 border-dashed border-amber-400/50 rounded-2xl relative overflow-hidden space-y-4 animate-in fade-in duration-300">
-                        <div className="absolute top-2 right-2 text-brand-blue font-mono font-bold text-[10px]">
-                          # {bookingReceipt.code}
-                        </div>
-                        
-                        <h4 className="font-bold text-xs text-brand-blue uppercase font-mono border-b border-brand-gold/20 pb-1 flex items-center gap-1">
-                          <span>🎟️</span> {currentLang === 'ar' ? 'تذكرة حجز معتمدة' : 'Confirmed Table Receipt'}
-                        </h4>
-
-                        <div className="space-y-1.5 text-xs">
-                          <p><span className="text-gray-500 font-semibold">{currentLang === 'ar' ? 'الاسم' : 'Name'}:</span> <span className="font-bold text-brand-blue">{bookingReceipt.name}</span></p>
-                          <p><span className="text-gray-500 font-semibold">{currentLang === 'ar' ? 'الهاتف' : 'Phone'}:</span> <span className="font-mono">{bookingReceipt.phone}</span></p>
-                          <p><span className="text-gray-500 font-semibold">{currentLang === 'ar' ? 'الفرع' : 'Branch'}:</span> <span className="font-bold">{bookingReceipt.branch}</span></p>
-                          <p><span className="text-gray-500 font-semibold">{currentLang === 'ar' ? 'عدد الأفراد' : 'Guests'}:</span> <span className="font-bold font-mono">{bookingReceipt.guests}</span></p>
-                          <p><span className="text-gray-500 font-semibold">{currentLang === 'ar' ? 'التاريخ والوقت' : 'Date & Time'}:</span> <span className="font-mono font-bold text-brand-red">{bookingReceipt.date} @ {bookingReceipt.time}</span></p>
-                        </div>
-
-                        <div className="bg-brand-blue text-brand-cream p-2.5 rounded-xl text-center text-[10px] font-semibold">
-                          {currentLang === 'ar' ? 'يرجى تقديم التذكرة للمضيف عند الوصول.' : 'Show this ticket to the host upon arrival.'}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Booking Form Area */}
-                  <form onSubmit={handleBookingSubmit} className="lg:col-span-7 space-y-4 p-6 bg-slate-50 border border-slate-100 rounded-3xl">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-brand-blue mb-1.5">{currentLang === 'ar' ? 'اختر الفرع' : 'Select Branch'}</label>
-                        <select
-                          value={bookingBranch}
-                          onChange={(e) => setBookingBranch(e.target.value as 'medical' | 'waha')}
-                          className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-white focus:outline-brand-blue cursor-pointer"
-                        >
-                          <option value="medical">{t.medicalBranch}</option>
-                          <option value="waha">{t.wahaBranch}</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-brand-blue mb-1.5">{currentLang === 'ar' ? 'عدد الأفراد' : 'Guests Count'}</label>
-                        <select
-                          value={bookingGuests}
-                          onChange={(e) => setBookingGuests(Number(e.target.value))}
-                          className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-white focus:outline-brand-blue font-mono cursor-pointer"
-                        >
-                          <option value="2">2 People (Couple) 👩‍❤️‍👨</option>
-                          <option value="4">4 People (Family) 👨‍👩‍👧‍👦</option>
-                          <option value="6">6 People (Gourmet group) 🥂</option>
-                          <option value="10">10 People (Royal Gathering) 👑</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-brand-blue mb-1.5">{currentLang === 'ar' ? 'التاريخ المفضّل' : 'Select Date'}</label>
-                        <input
-                          type="date"
-                          value={bookingDate}
-                          onChange={(e) => setBookingDate(e.target.value)}
-                          required
-                          className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-white focus:outline-brand-blue font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-brand-blue mb-1.5">{currentLang === 'ar' ? 'الوقت المفضّل' : 'Select Time'}</label>
-                        <input
-                          type="time"
-                          value={bookingTime}
-                          onChange={(e) => setBookingTime(e.target.value)}
-                          required
-                          className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-white focus:outline-brand-blue font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-brand-blue mb-1.5">{currentLang === 'ar' ? 'اسم صاحب الحجز' : 'Your Full Name'}</label>
-                        <input
-                          type="text"
-                          value={bookingName}
-                          onChange={(e) => setBookingName(e.target.value)}
-                          placeholder="Pierre Marc"
-                          required
-                          className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-white focus:outline-brand-blue"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-brand-blue mb-1.5">{currentLang === 'ar' ? 'رقم الهاتف للتأكيد' : 'Phone Number'}</label>
-                        <input
-                          type="tel"
-                          value={bookingPhone}
-                          onChange={(e) => setBookingPhone(e.target.value)}
-                          placeholder="+20 1..."
-                          required
-                          className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-white focus:outline-brand-blue font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-3.5 bg-brand-gold hover:bg-brand-gold/90 text-brand-blue font-bold rounded-xl text-xs flex items-center justify-center gap-1 shadow-md transition-all duration-300 cursor-pointer"
-                    >
-                      <span>✅</span> {currentLang === 'ar' ? 'تأكيد وحجز الطاولة فوراً' : 'Confirm & Print Reservation Voucher'}
-                    </button>
-                  </form>
-                </div>
-              </div>
-            )}
-
             {/* OFFERS VIEW */}
             {activeAppTab === 'offers' && (
               <div className="space-y-8">
@@ -1716,9 +1875,19 @@ ${itemsList}
                     onAddCategory={handleAddCategory}
                     onDeleteCategory={handleDeleteCategory}
                     onUpdateCategory={handleUpdateCategory}
+                    onDatabaseMutated={handleDatabaseMutated}
                   />
                 </div>
               </div>
+            )}
+
+            {/* REVIEWS & DISCUSSIONS VIEW */}
+            {activeAppTab === 'reviews' && (
+              <ReviewsDiscussion
+                currentLang={currentLang}
+                currentUser={currentUser}
+                onOpenLogin={() => setActiveAppTab('account')}
+              />
             )}
 
             {/* MY ACCOUNT VIEW */}
@@ -1778,6 +1947,38 @@ ${itemsList}
                           </span>
                         </div>
                       </div>
+
+                      {/* GEMINI AI PROFILE IMAGE CULINARY PERSONALITY ANALYSIS */}
+                      {currentUser.details?.aiAnalysis && (
+                        <div className="bg-gradient-to-br from-indigo-50/75 to-purple-50/50 border border-indigo-100/60 rounded-2xl p-4 md:p-5 space-y-3 shadow-xs text-start">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">🔮</span>
+                            <h4 className="text-xs font-black text-indigo-800 uppercase tracking-wider">
+                              {currentLang === 'ar' ? 'تحليل صورتك بالذكاء الاصطناعي Gemini:' : 'Gemini AI Face Taste Analysis:'}
+                            </h4>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-[10px] font-bold">
+                              <span>🌟</span>
+                              <span>{currentUser.details.aiAnalysis.culinaryMood}</span>
+                            </div>
+                            
+                            <p className="text-[11px] text-indigo-950 leading-relaxed font-semibold">
+                              {currentUser.details.aiAnalysis.personalityAnalysis}
+                            </p>
+                            
+                            <div className="bg-white/80 border border-indigo-100/80 p-2.5 rounded-xl text-[11px] flex items-center justify-between shadow-xs">
+                              <span className="text-slate-600 font-bold">
+                                {currentLang === 'ar' ? 'طبقك المثالي الموصى به:' : 'Your recommended perfect dish:'}
+                              </span>
+                              <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-[10px]">
+                                {currentUser.details.aiAnalysis.recommendedDish}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* EXCLUSIVE AUTO-SENT PROMOS NEWSLETTER DISPLAY FOR ACTIVE CUSTOMERS */}
                       <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-4 md:p-5 space-y-3">
@@ -1868,235 +2069,461 @@ ${itemsList}
                     </div>
                   ) : (
                     <div className="space-y-6">
-                      <div className="text-center space-y-2">
-                        <span className="inline-block p-2 bg-brand-gold/10 rounded-full text-lg">✨</span>
-                        <h3 className="serif-heading text-xl font-extrabold text-brand-blue">
-                          {currentLang === 'ar' ? 'إنشاء حساب زبون جديد فخم' : 'Register Gourmet Customer Account'}
-                        </h3>
-                        <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                          {currentLang === 'ar' 
-                            ? 'سجل حسابك مجاناً لتتمكن من الطلب وحجز الطاولات، وستصلك جميع عروضنا والمنتجات الجديدة تلقائياً وإجبارياً على بريدك الإلكتروني.' 
-                            : 'Sign up to manage table reservations, order dishes, and auto-subscribe to premium emails.'}
-                        </p>
+                      {/* Form Tabs */}
+                      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/40">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthFormTab('register');
+                            setRegError('');
+                          }}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                            authFormTab === 'register'
+                              ? 'bg-white text-brand-blue shadow-sm'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          {currentLang === 'ar' ? '✨ إنشاء حساب جديد' : '✨ Register New'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthFormTab('login');
+                            setRegError('');
+                          }}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                            authFormTab === 'login'
+                              ? 'bg-white text-brand-blue shadow-sm'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          {currentLang === 'ar' ? '🔑 لدي حساب مسجل' : '🔑 Existing Account'}
+                        </button>
                       </div>
 
-                      {regError && (
-                        <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-brand-red leading-relaxed flex items-start gap-2 animate-shake">
-                          <span className="text-sm">⚠️</span>
-                          <div>
-                            <span className="font-bold block mb-0.5">{currentLang === 'ar' ? 'حدث خطأ في التسجيل:' : 'Registration Refused:'}</span>
-                            {regError}
+                      {authFormTab === 'register' ? (
+                        <>
+                          <div className="text-center space-y-2">
+                            <span className="inline-block p-2 bg-brand-gold/10 rounded-full text-lg">✨</span>
+                            <h3 className="serif-heading text-xl font-extrabold text-brand-blue">
+                              {currentLang === 'ar' ? 'إنشاء حساب زبون جديد فخم' : 'Register Gourmet Customer Account'}
+                            </h3>
+                            <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                              {currentLang === 'ar' 
+                                ? 'سجل حسابك مجاناً لتتمكن من الطلب وحجز الطاولات، وستصلك جميع عروضنا والمنتجات الجديدة تلقائياً وإجبارياً على بريدك الإلكتروني.' 
+                                : 'Sign up to manage table reservations, order dishes, and auto-subscribe to premium emails.'}
+                            </p>
                           </div>
-                        </div>
-                      )}
 
-                      <form 
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          if (!regFirstName || !regSecondName || !regThirdName || !regEmail || !regPhone || !regAltPhone) {
-                            setRegError(currentLang === 'ar' ? 'يرجى إدخال كافة المعلومات النصية المطلوبة أولاً.' : 'Please enter all required text fields.');
-                            return;
-                          }
-                          if (!regPicture) {
-                            setRegError(currentLang === 'ar' ? 'صورة الحساب الشخصي إجبارية! يرجى رفع صورة واضحة لوجهك الشخصي.' : 'Profile picture is mandatory! Please upload a clear photo.');
-                            return;
-                          }
+                          {regError && (
+                            <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-brand-red leading-relaxed flex items-start gap-2 animate-shake">
+                              <span className="text-sm">⚠️</span>
+                              <div className="text-start">
+                                <span className="font-bold block mb-0.5">{currentLang === 'ar' ? 'حدث خطأ في التسجيل:' : 'Registration Refused:'}</span>
+                                {regError}
+                              </div>
+                            </div>
+                          )}
 
-                          setRegLoading(true);
-                          setRegError('');
+                          <form 
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!regFirstName || !regSecondName || !regThirdName || !regEmail || !regPhone || !regAltPhone) {
+                                setRegError(currentLang === 'ar' ? 'يرجى إدخال كافة المعلومات النصية المطلوبة أولاً.' : 'Please enter all required text fields.');
+                                return;
+                              }
+                              if (!checkEgyptianPhone(regPhone)) {
+                                setRegError(currentLang === 'ar' 
+                                  ? 'رقم الهاتف الأساسي غير صحيح! يجب إدخال رقم هاتف محمول مصري حقيقي نشط (مكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015).' 
+                                  : 'Invalid primary phone! Must be a real Egyptian mobile number starting with 010, 011, 012, or 015 (11 digits).');
+                                return;
+                              }
+                              if (!checkEgyptianPhone(regAltPhone)) {
+                                setRegError(currentLang === 'ar' 
+                                  ? 'رقم الهاتف الاحتياطي غير صحيح! يجب إدخال رقم هاتف محمول مصري حقيقي احتياطي مختلف (مكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015).' 
+                                  : 'Invalid alternative phone! Must be a real Egyptian mobile number starting with 010, 011, 012, or 015 (11 digits).');
+                                return;
+                              }
+                              if (regPhone.replace(/\D/g, "") === regAltPhone.replace(/\D/g, "")) {
+                                setRegError(currentLang === 'ar' 
+                                  ? 'رقم الهاتف الاحتياطي يجب أن يكون مختلفاً تماماً عن رقم الهاتف الأساسي.' 
+                                  : 'Alternative phone number must be different from primary phone number.');
+                                return;
+                              }
+                              if (!regPicture) {
+                                setRegError(currentLang === 'ar' ? 'صورة الحساب الشخصي إجبارية! يرجى رفع صورة واضحة لوجهك الشخصي.' : 'Profile picture is mandatory! Please upload a clear photo.');
+                                return;
+                              }
 
-                          try {
-                            const response = await fetch('/api/auth/register-customer', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                firstName: regFirstName,
-                                secondName: regSecondName,
-                                thirdName: regThirdName,
-                                email: regEmail,
-                                phone: regPhone,
-                                alternativePhone: regAltPhone,
-                                picture: regPicture
-                              })
-                            });
+                              setRegLoading(true);
+                              setRegError('');
 
-                            const data = await response.json();
-                            if (response.ok && data.success) {
-                              // Reset registration form values
-                              setRegFirstName('');
-                              setRegSecondName('');
-                              setRegThirdName('');
-                              setRegEmail('');
-                              setRegPhone('');
-                              setRegAltPhone('');
-                              setRegPicture('');
-                              
-                              // Trigger login
-                              handleLoginSuccess(data.user);
-                              
-                              // Show friendly success confirmation alert
-                              alert(currentLang === 'ar' 
-                                ? `🎉 تم تسجيل حسابك بنجاح ومطابقة ملامح صورتك بالذكاء الاصطناعي Gemini!\n📬 تم إرسال نشرة العروض والمنتجات الجديدة تلقائياً إلى بريدك الإلكتروني: ${data.user.email}` 
-                                : `🎉 Registration successful! Face matched successfully via Gemini AI.\n📬 New offers & dishes sent to your Gmail: ${data.user.email}`
-                              );
-                            } else {
-                              setRegError(data.error || 'Registration failed');
-                            }
-                          } catch (err) {
-                            console.error(err);
-                            setRegError(currentLang === 'ar' ? 'فشل الاتصال بالخادم لمراجعة الصورة والبيانات.' : 'Server connection failed.');
-                          } finally {
-                            setRegLoading(false);
-                          }
-                        }} 
-                        className="space-y-4"
-                      >
-                        {/* TRIPLE NAME FIELDS */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                              {currentLang === 'ar' ? 'الاسم الأول *' : 'First Name *'}
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={regFirstName}
-                              onChange={(e) => setRegFirstName(e.target.value)}
-                              placeholder={currentLang === 'ar' ? 'مثال: أحمد' : 'e.g. Ahmad'}
-                              className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                              {currentLang === 'ar' ? 'الاسم الثاني *' : 'Second Name *'}
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={regSecondName}
-                              onChange={(e) => setRegSecondName(e.target.value)}
-                              placeholder={currentLang === 'ar' ? 'مثال: محمد' : 'e.g. Mohamed'}
-                              className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                              {currentLang === 'ar' ? 'الاسم الثالث *' : 'Third Name *'}
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={regThirdName}
-                              onChange={(e) => setRegThirdName(e.target.value)}
-                              placeholder={currentLang === 'ar' ? 'مثال: علي' : 'e.g. Ali'}
-                              className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
-                            />
-                          </div>
-                        </div>
+                              try {
+                                const response = await fetch('/api/auth/register-customer', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    firstName: regFirstName,
+                                    secondName: regSecondName,
+                                    thirdName: regThirdName,
+                                    email: regEmail,
+                                    phone: regPhone,
+                                    alternativePhone: regAltPhone,
+                                    picture: regPicture
+                                  })
+                                });
 
-                        {/* EMAIL / GMAIL */}
-                        <div>
-                          <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                            {currentLang === 'ar' ? 'البريد الإلكتروني (الجيميل الخاص بك) *' : 'Gmail Address *'}
-                          </label>
-                          <input
-                            type="email"
-                            required
-                            value={regEmail}
-                            onChange={(e) => setRegEmail(e.target.value)}
-                            placeholder="example@gmail.com"
-                            className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
-                          />
-                        </div>
-
-                        {/* PHONE NUMBERS */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                              {currentLang === 'ar' ? 'رقم الهاتف *' : 'Phone Number *'}
-                            </label>
-                            <input
-                              type="tel"
-                              required
-                              value={regPhone}
-                              onChange={(e) => setRegPhone(e.target.value)}
-                              placeholder="01xxxxxxxxx"
-                              className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                              {currentLang === 'ar' ? 'رقم هاتف احتياطي *' : 'Alternative Phone *'}
-                            </label>
-                            <input
-                              type="tel"
-                              required
-                              value={regAltPhone}
-                              onChange={(e) => setRegAltPhone(e.target.value)}
-                              placeholder="01xxxxxxxxx"
-                              className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
-                            />
-                          </div>
-                        </div>
-
-                        {/* MANDATORY HUMAN PHOTO UPLOAD */}
-                        <div className="space-y-2">
-                          <label className="block text-[10px] font-extrabold uppercase tracking-wider text-brand-blue">
-                            {currentLang === 'ar' ? 'صورة الحساب الشخصي (إجبارية بشرية حقيقية) *' : 'Mandatory Profile Photo (Real Human Face) *'}
-                          </label>
-                          
-                          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-brand-gold transition-all relative bg-slate-50/50">
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              required
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setRegPicture(reader.result as string);
-                                  setRegError('');
-                                };
-                                reader.readAsDataURL(file);
-                              }}
-                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                            />
-                            
-                            {regPicture ? (
-                              <div className="space-y-2">
-                                <img 
-                                  src={regPicture} 
-                                  alt="Preview" 
-                                  className="w-20 h-20 rounded-full mx-auto object-cover border-2 border-brand-gold shadow-md"
+                                const data = await response.json();
+                                if (response.ok && data.success) {
+                                  // Reset registration form values
+                                  setRegFirstName('');
+                                  setRegSecondName('');
+                                  setRegThirdName('');
+                                  setRegEmail('');
+                                  setRegPhone('');
+                                  setRegAltPhone('');
+                                  setRegPicture('');
+                                  
+                                  // Trigger login
+                                  handleLoginSuccess(data.user);
+                                  
+                                  // Show friendly success confirmation alert
+                                  alert(currentLang === 'ar' 
+                                    ? `🎉 تم تسجيل حسابك بنجاح ومطابقة ملامح صورتك بالذكاء الاصطناعي Gemini!\n📬 تم إرسال نشرة العروض والمنتجات الجديدة تلقائياً إلى بريدك الإلكتروني: ${data.user.email}` 
+                                    : `🎉 Registration successful! Face matched successfully via Gemini AI.\n📬 New offers & dishes sent to your Gmail: ${data.user.email}`
+                                  );
+                                } else {
+                                  setRegError(data.error || 'Registration failed');
+                                }
+                              } catch (err) {
+                                console.error(err);
+                                setRegError(currentLang === 'ar' ? 'فشل الاتصال بالخادم لمراجعة الصورة والبيانات.' : 'Server connection failed.');
+                              } finally {
+                                setRegLoading(false);
+                              }
+                            }} 
+                            className="space-y-4"
+                          >
+                            {/* TRIPLE NAME FIELDS */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                                  {currentLang === 'ar' ? 'الاسم الأول *' : 'First Name *'}
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={regFirstName}
+                                  onChange={(e) => setRegFirstName(e.target.value)}
+                                  placeholder={currentLang === 'ar' ? 'مثال: أحمد' : 'e.g. Ahmad'}
+                                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
                                 />
-                                <span className="block text-[10px] text-emerald-600 font-bold">✓ تم تجهيز الصورة بنجاح</span>
-                                <span className="block text-[9px] text-slate-400">{currentLang === 'ar' ? 'انقر أو اسحب لتغيير الصورة' : 'Click or drag to change'}</span>
                               </div>
-                            ) : (
-                              <div className="space-y-1 py-2">
-                                <span className="text-2xl block">📸</span>
-                                <span className="block text-xs font-bold text-slate-600">{currentLang === 'ar' ? 'اختر صورة شخصية حقيقية لك' : 'Select a real photo of yourself'}</span>
-                                <span className="block text-[10px] text-slate-400 leading-relaxed max-w-xs mx-auto">
-                                  {currentLang === 'ar' 
-                                    ? 'يجب أن تكون صورتك الشخصية بملامح واضحة وظاهرة ليقبلها نظام التحقق من الوجه بالذكاء الاصطناعي Gemini.' 
-                                    : 'Your face features must be clearly visible. Selfies or portraits are verified live via Gemini AI.'}
-                                </span>
+                              <div>
+                                <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                                  {currentLang === 'ar' ? 'الاسم الثاني *' : 'Second Name *'}
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={regSecondName}
+                                  onChange={(e) => setRegSecondName(e.target.value)}
+                                  placeholder={currentLang === 'ar' ? 'مثال: محمد' : 'e.g. Mohamed'}
+                                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                                />
                               </div>
-                            )}
+                              <div>
+                                <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                                  {currentLang === 'ar' ? 'الاسم الثالث *' : 'Third Name *'}
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={regThirdName}
+                                  onChange={(e) => setRegThirdName(e.target.value)}
+                                  placeholder={currentLang === 'ar' ? 'مثال: علي' : 'e.g. Ali'}
+                                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                                />
+                              </div>
+                            </div>
+
+                            {/* EMAIL / GMAIL */}
+                            <div>
+                              <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                                {currentLang === 'ar' ? 'البريد الإلكتروني (الجيميل الخاص بك) *' : 'Gmail Address *'}
+                              </label>
+                              <input
+                                type="email"
+                                required
+                                value={regEmail}
+                                onChange={(e) => setRegEmail(e.target.value)}
+                                placeholder="example@gmail.com"
+                                className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                              />
+                            </div>
+
+                            {/* PHONE NUMBERS INSTRUCTIONAL BANNER */}
+                            <div className="bg-gradient-to-br from-amber-50/80 to-amber-100/40 border border-amber-200/80 rounded-2xl p-4 text-start space-y-1.5 shadow-sm">
+                              <div className="flex items-center gap-1.5 text-xs font-black text-amber-800">
+                                <span className="text-sm">🇪🇬</span>
+                                <span>{currentLang === 'ar' ? 'تعليمات وإرشادات هامة لأرقام الهواتف:' : 'Egyptian Phone Verification Rules:'}</span>
+                              </div>
+                              <ul className="text-[10px] text-amber-700 leading-relaxed font-semibold list-disc list-inside space-y-1">
+                                {currentLang === 'ar' ? (
+                                  <>
+                                    <li>يجب أن تكون أرقام الهواتف تابعة لشبكات الاتصالات المصرية (فودافون، أورانج، اتصالات، وي).</li>
+                                    <li>يجب إدخال الأرقام بالصيغة المحلية المكونة من 11 رقماً (مثل: <span className="font-mono bg-white/60 px-1 rounded text-amber-900">01012345678</span>).</li>
+                                    <li>يجب أن يكون الهاتف الأساسي نشطاً لاستقبال إيصال الأوردر عبر الواتساب.</li>
+                                    <li>يُمنع منعاً باتاً تكرار نفس الرقم في حقل الهاتف الأساسي والاحتياطي.</li>
+                                  </>
+                                ) : (
+                                  <>
+                                    <li>Phone numbers must belong to standard Egyptian mobile networks (Vodafone, Orange, Etisalat, WE).</li>
+                                    <li>Use the 11-digit local format (e.g., <span className="font-mono bg-white/60 px-1 rounded text-amber-900">01012345678</span>).</li>
+                                    <li>The primary phone must have active WhatsApp to accept gourmet order receipts.</li>
+                                    <li>Primary and alternative phone numbers must be completely distinct.</li>
+                                  </>
+                                )}
+                              </ul>
+                            </div>
+
+                            {/* PHONE NUMBERS */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-start">
+                              <div>
+                                <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                                  {currentLang === 'ar' ? 'رقم الهاتف الأساسي *' : 'Primary Phone *'}
+                                </label>
+                                <input
+                                  type="tel"
+                                  required
+                                  value={regPhone}
+                                  onChange={(e) => setRegPhone(e.target.value)}
+                                  placeholder="01xxxxxxxxx"
+                                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                                />
+                                {regPhone && (
+                                  <div className="mt-1 text-[9px] font-bold">
+                                    {checkEgyptianPhone(regPhone) ? (
+                                      <span className="text-emerald-600 flex items-center gap-1">✓ {currentLang === 'ar' ? 'رقم محمول مصري معتمد' : 'Approved Egyptian mobile'}</span>
+                                    ) : (
+                                      <span className="text-rose-500 flex items-center gap-1">⚠️ {currentLang === 'ar' ? 'يرجى إدخال رقم هاتف مصري حقيقي (11 رقم)' : 'Enter 11-digit Egyptian phone'}</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                                  {currentLang === 'ar' ? 'رقم هاتف احتياطي مختلف *' : 'Alternative Phone *'}
+                                </label>
+                                <input
+                                  type="tel"
+                                  required
+                                  value={regAltPhone}
+                                  onChange={(e) => setRegAltPhone(e.target.value)}
+                                  placeholder="01xxxxxxxxx"
+                                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                                />
+                                {regAltPhone && (
+                                  <div className="mt-1 text-[9px] font-bold">
+                                    {checkEgyptianPhone(regAltPhone) ? (
+                                      regPhone && regPhone.replace(/\D/g, "") === regAltPhone.replace(/\D/g, "") ? (
+                                        <span className="text-rose-500 flex items-center gap-1">⚠️ {currentLang === 'ar' ? 'يجب أن يكون مختلفاً عن الهاتف الأساسي' : 'Must differ from primary phone'}</span>
+                                      ) : (
+                                        <span className="text-emerald-600 flex items-center gap-1">✓ {currentLang === 'ar' ? 'رقم محمول احتياطي معتمد' : 'Approved alternative mobile'}</span>
+                                      )
+                                    ) : (
+                                      <span className="text-rose-500 flex items-center gap-1">⚠️ {currentLang === 'ar' ? 'يرجى إدخال رقم هاتف مصري حقيقي (11 رقم)' : 'Enter 11-digit Egyptian phone'}</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* MANDATORY HUMAN PHOTO UPLOAD */}
+                            <div className="space-y-2 text-start">
+                              <label className="block text-[10px] font-extrabold uppercase tracking-wider text-brand-blue">
+                                {currentLang === 'ar' ? 'صورة الحساب الشخصي (إجبارية بشرية حقيقية) *' : 'Mandatory Profile Photo (Real Human Face) *'}
+                              </label>
+                              
+                              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-brand-gold transition-all relative bg-slate-50/50">
+                                <input 
+                                  type="file" 
+                                  accept="image/*" 
+                                  required
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                      setRegPicture(reader.result as string);
+                                      setRegError('');
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }}
+                                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                />
+                                
+                                {regPicture ? (
+                                  <div className="space-y-2">
+                                    <img 
+                                      src={regPicture} 
+                                      alt="Preview" 
+                                      className="w-20 h-20 rounded-full mx-auto object-cover border-2 border-brand-gold shadow-md"
+                                    />
+                                    <span className="block text-[10px] text-emerald-600 font-bold">✓ تم تجهيز الصورة بنجاح</span>
+                                    <span className="block text-[9px] text-slate-400">{currentLang === 'ar' ? 'انقر أو اسحب لتغيير الصورة' : 'Click or drag to change'}</span>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-1 py-2">
+                                    <span className="text-2xl block">📸</span>
+                                    <span className="block text-xs font-bold text-slate-600">{currentLang === 'ar' ? 'اختر صورة شخصية حقيقية لك' : 'Select a real photo of yourself'}</span>
+                                    <span className="block text-[10px] text-slate-400 leading-relaxed max-w-xs mx-auto">
+                                      {currentLang === 'ar' 
+                                        ? 'يجب أن تكون صورتك الشخصية بملامح واضحة وظاهرة ليقبلها نظام التحقق من الوجه بالذكاء الاصطناعي Gemini.' 
+                                        : 'Your face features must be clearly visible. Selfies or portraits are verified live via Gemini AI.'}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="submit"
+                              className="w-full py-4 bg-brand-blue hover:bg-brand-blue/95 text-white font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer transform hover:-translate-y-0.5"
+                            >
+                              <span>👑</span>
+                              <span>{currentLang === 'ar' ? 'إنشاء حساب الزبون وتأكيد الاشتراك' : 'Register & Authorize Account'}</span>
+                            </button>
+                          </form>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-center space-y-2">
+                            <span className="inline-block p-2 bg-brand-gold/10 rounded-full text-lg">🔑</span>
+                            <h3 className="serif-heading text-xl font-extrabold text-brand-blue">
+                              {currentLang === 'ar' ? 'استعادة بيانات حسابي المسجل' : 'Retrieve My Registered Account'}
+                            </h3>
+                            <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                              {currentLang === 'ar' 
+                                ? 'أدخل معلومات حسابك المسجل مسبقاً لمطابقتها واستعادة حسابك وصورتك المعتمدة بالذكاء الاصطناعي فوراً.' 
+                                : 'Enter your registered email, full name, and phone number to restore your account details instantly.'}
+                            </p>
                           </div>
-                        </div>
 
-                        <button
-                          type="submit"
-                          className="w-full py-4 bg-brand-blue hover:bg-brand-blue/95 text-white font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer transform hover:-translate-y-0.5"
-                        >
-                          <span>👑</span>
-                          <span>{currentLang === 'ar' ? 'إنشاء حساب الزبون وتأكيد الاشتراك' : 'Register & Authorize Account'}</span>
-                        </button>
-                      </form>
+                          {regError && (
+                            <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-brand-red leading-relaxed flex items-start gap-2 animate-shake">
+                              <span className="text-sm">⚠️</span>
+                              <div className="text-start">
+                                <span className="font-bold block mb-0.5">{currentLang === 'ar' ? 'فشل التحقق والمطابقة:' : 'Verification Denied:'}</span>
+                                {regError}
+                              </div>
+                            </div>
+                          )}
 
-                      {/* End of registration form */}
+                          <form
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!loginEmail || !loginName || !loginPhone) {
+                                setRegError(currentLang === 'ar' ? 'يرجى إدخال كافة البيانات المطلوبة للمطابقة.' : 'Please enter all required fields.');
+                                return;
+                              }
+                              setRegLoading(true);
+                              setRegError('');
+
+                              try {
+                                const response = await fetch('/api/auth/login-existing-customer', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    email: loginEmail,
+                                    name: loginName,
+                                    phone: loginPhone
+                                  })
+                                });
+
+                                const data = await response.json();
+                                if (response.ok && data.success) {
+                                  setLoginEmail('');
+                                  setLoginName('');
+                                  setLoginPhone('');
+                                  handleLoginSuccess(data.user);
+                                  alert(currentLang === 'ar'
+                                    ? `🎉 تم التحقق بنجاح ومطابقة ملامح صورتك المعتمدة! أهلاً بك مجدداً: ${data.user.name}`
+                                    : `🎉 Verified successfully! Welcome back, ${data.user.name}`
+                                  );
+                                } else {
+                                  setRegError(data.error || 'Matching failed');
+                                }
+                              } catch (err) {
+                                console.error(err);
+                                setRegError(currentLang === 'ar' ? 'فشل الاتصال بالخادم لمطابقة البيانات.' : 'Server connection failed.');
+                              } finally {
+                                setRegLoading(false);
+                              }
+                            }}
+                            className="space-y-4 text-start"
+                          >
+                            <div>
+                              <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                                {currentLang === 'ar' ? 'البريد الإلكتروني الجيميل المسجل *' : 'Registered Gmail *'}
+                              </label>
+                              <input
+                                type="email"
+                                required
+                                value={loginEmail}
+                                onChange={(e) => setLoginEmail(e.target.value)}
+                                placeholder="name@example.com"
+                                className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                                {currentLang === 'ar' ? 'الاسم بالكامل المسجل *' : 'Registered Full Name *'}
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={loginName}
+                                onChange={(e) => setLoginName(e.target.value)}
+                                placeholder={currentLang === 'ar' ? 'مثال: أحمد محمد علي' : 'e.g. Ahmad Mohamed Ali'}
+                                className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
+                                {currentLang === 'ar' ? 'رقم الهاتف المسجل *' : 'Registered Phone Number *'}
+                              </label>
+                              <input
+                                type="tel"
+                                required
+                                value={loginPhone}
+                                onChange={(e) => setLoginPhone(e.target.value)}
+                                placeholder="01xxxxxxxxx"
+                                className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                              />
+                              {loginPhone && (
+                                <div className="mt-1 text-[9px] font-bold">
+                                  {checkEgyptianPhone(loginPhone) ? (
+                                    <span className="text-emerald-600 flex items-center gap-1">✓ {currentLang === 'ar' ? 'رقم محمول مصري معتمد' : 'Approved Egyptian mobile'}</span>
+                                  ) : (
+                                    <span className="text-rose-500 flex items-center gap-1">⚠️ {currentLang === 'ar' ? 'يرجى إدخال رقم هاتف مصري حقيقي (11 رقم)' : 'Enter 11-digit Egyptian phone'}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              type="submit"
+                              className="w-full py-4 bg-brand-blue hover:bg-brand-blue/95 text-white font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer transform hover:-translate-y-0.5"
+                            >
+                              <span>🔑</span>
+                              <span>{currentLang === 'ar' ? 'المطابقة واستعادة الحساب فوراً' : 'Verify & Retrieve Account'}</span>
+                            </button>
+                          </form>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2520,16 +2947,6 @@ ${itemsList}
         </button>
 
         <button
-          onClick={() => { setActiveAppTab('reserve'); setIsAdminConsoleVisible(false); }}
-          className={`flex flex-col items-center gap-0.5 text-[9px] font-bold py-1 px-3 rounded-xl transition-all ${
-            activeAppTab === 'reserve' ? 'text-brand-blue scale-105 font-black' : 'text-slate-400'
-          }`}
-        >
-          <Ticket className={`w-5 h-5 ${activeAppTab === 'reserve' ? 'text-brand-gold' : ''}`} />
-          <span>{currentLang === 'ar' ? 'الحجز' : 'Reserve'}</span>
-        </button>
-
-        <button
           onClick={() => { setActiveAppTab('offers'); setIsAdminConsoleVisible(false); }}
           className={`flex flex-col items-center gap-0.5 text-[9px] font-bold py-1 px-3 rounded-xl transition-all ${
             activeAppTab === 'offers' ? 'text-brand-blue scale-105 font-black' : 'text-slate-400'
@@ -2547,6 +2964,16 @@ ${itemsList}
         >
           <Map className={`w-5 h-5 ${activeAppTab === 'locations' ? 'text-brand-gold' : ''}`} />
           <span>{currentLang === 'ar' ? 'الفروع' : 'Branches'}</span>
+        </button>
+
+        <button
+          onClick={() => { setActiveAppTab('reviews'); setIsAdminConsoleVisible(false); }}
+          className={`flex flex-col items-center gap-0.5 text-[9px] font-bold py-1 px-3 rounded-xl transition-all ${
+            activeAppTab === 'reviews' ? 'text-brand-blue scale-105 font-black' : 'text-slate-400'
+          }`}
+        >
+          <MessageSquare className={`w-5 h-5 ${activeAppTab === 'reviews' ? 'text-brand-gold' : ''}`} />
+          <span>{currentLang === 'ar' ? 'التقييمات' : 'Reviews'}</span>
         </button>
 
         <button
@@ -2586,6 +3013,21 @@ ${itemsList}
         currentLang={currentLang}
         onConfirm={handleCustomizerConfirm}
       />
+
+      {currentUser?.role === 'Developer' && previewRole !== 'Developer' && (
+        <div className="fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 bg-stone-900 border border-amber-500/30 text-stone-100 px-4 py-2.5 rounded-full shadow-2xl backdrop-blur-md">
+          <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+          <span className="text-xs font-bold text-stone-300">
+            {currentLang === 'ar' ? `محاكاة دور (${previewRole === 'Manager' ? 'المدير' : 'الزبون'})` : `Simulating: ${previewRole}`}
+          </span>
+          <button
+            onClick={() => setPreviewRole('Developer')}
+            className="text-xs font-black text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 rounded-full border border-amber-500/20 transition-all cursor-pointer"
+          >
+            {currentLang === 'ar' ? 'الرجوع للمطور 🛠️' : 'Back to Console 🛠️'}
+          </button>
+        </div>
+      )}
 
     </div>
   );

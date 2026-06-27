@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { 
   Users, PlusCircle, Sparkles, Calendar, BookOpen, 
-  Trash2, Edit, Check, AlertCircle, Eye, LogOut, ArrowLeftRight, FolderPlus
+  Trash2, Edit, Check, AlertCircle, Eye, LogOut, ArrowLeftRight, FolderPlus,
+  MessageSquare, Send, Star
 } from 'lucide-react';
 import { 
   Product, ExclusiveOffer, WeeklyOffer, Manager, 
   Language, Category, TRANSLATIONS, LANGUAGES, CategoryItem 
 } from '../types';
+import AICopilotConsole from './AICopilotConsole';
+import ReviewsManagerTab from './ReviewsManagerTab';
 
 interface AdminManagerConsoleProps {
   currentLang: Language;
@@ -17,8 +20,8 @@ interface AdminManagerConsoleProps {
   products: Product[];
   exclusiveOffer: ExclusiveOffer;
   weeklyOffers: WeeklyOffer[];
-  activeTab: 'products' | 'offers' | 'super';
-  setActiveTab: (tab: 'products' | 'offers' | 'super') => void;
+  activeTab: 'products' | 'offers' | 'super' | 'copilot' | 'reviews';
+  setActiveTab: (tab: 'products' | 'offers' | 'super' | 'copilot' | 'reviews') => void;
   onAddManager: (email: string, name: string, password?: string, lang?: Language) => void;
   onRemoveManager: (email: string) => void;
   onSaveProduct: (product: Product) => void;
@@ -33,6 +36,7 @@ interface AdminManagerConsoleProps {
   onAddCategory: (id: string, name: any, icon?: string) => Promise<{ success: boolean; error?: string }>;
   onDeleteCategory: (id: string) => Promise<{ success: boolean; error?: string }>;
   onUpdateCategory: (id: string, name: any, icon?: string) => Promise<{ success: boolean; error?: string }>;
+  onDatabaseMutated: (updatedData: any) => void;
 }
 
 export default function AdminManagerConsole({
@@ -59,7 +63,8 @@ export default function AdminManagerConsole({
   categories = [],
   onAddCategory,
   onDeleteCategory,
-  onUpdateCategory
+  onUpdateCategory,
+  onDatabaseMutated
 }: AdminManagerConsoleProps) {
   const t = TRANSLATIONS[currentLang];
   
@@ -72,6 +77,7 @@ export default function AdminManagerConsole({
 
   // Dynamic Category form state
   const [newCatId, setNewCatId] = useState('');
+  const [singleCatName, setSingleCatName] = useState('');
   const [newCatNameAr, setNewCatNameAr] = useState('');
   const [newCatNameEn, setNewCatNameEn] = useState('');
   const [newCatNameFr, setNewCatNameFr] = useState('');
@@ -127,6 +133,16 @@ export default function AdminManagerConsole({
   const [weeklyDescFr, setWeeklyDescFr] = useState('');
   const [weeklyDescIt, setWeeklyDescIt] = useState('');
   const [weeklyDiscount, setWeeklyDiscount] = useState('');
+  const [weeklyActive, setWeeklyActive] = useState(true);
+
+  // Single-input state variables for seamless automatic translation
+  const [singleProductName, setSingleProductName] = useState('');
+  const [singleProductDesc, setSingleProductDesc] = useState('');
+  const [singleExcTitle, setSingleExcTitle] = useState(exclusiveOffer.title[currentLang] || exclusiveOffer.title.en || exclusiveOffer.title.ar || '');
+  const [singleExcDesc, setSingleExcDesc] = useState(exclusiveOffer.description[currentLang] || exclusiveOffer.description.en || exclusiveOffer.description.ar || '');
+  const [singleWeeklyTitle, setSingleWeeklyTitle] = useState('');
+  const [singleWeeklyDesc, setSingleWeeklyDesc] = useState('');
+  const [showMultilingualFields, setShowMultilingualFields] = useState(false);
 
   // Confirmation state for deleting products (iframe-safe)
   const [productToDeleteId, setProductToDeleteId] = useState<string | null>(null);
@@ -153,6 +169,11 @@ export default function AdminManagerConsole({
     setPDescEn(p.description.en || '');
     setPDescFr(p.description.fr || '');
     setPDescIt(p.description.it || '');
+
+    const initialName = p.name[currentLang] || p.name.en || p.name.ar || p.name.fr || p.name.it || '';
+    const initialDesc = p.description ? (p.description[currentLang] || p.description.en || p.description.ar || p.description.fr || p.description.it || '') : '';
+    setSingleProductName(initialName);
+    setSingleProductDesc(initialDesc);
   };
 
   React.useEffect(() => {
@@ -182,6 +203,9 @@ export default function AdminManagerConsole({
     setPDescEn('');
     setPDescFr('');
     setPDescIt('');
+
+    setSingleProductName('');
+    setSingleProductDesc('');
   };
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,9 +293,8 @@ export default function AdminManagerConsole({
 
   const saveProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const availableName = pNameAr || pNameEn || pNameFr || pNameIt;
-    if (!availableName) {
-      alert(currentLang === 'ar' ? "يرجى كتابة اسم المنتج بلغة واحدة على الأقل." : "Please fill in the product name in at least one language.");
+    if (!singleProductName.trim()) {
+      alert(currentLang === 'ar' ? "يرجى كتابة اسم المنتج." : "Please fill in the product name.");
       return;
     }
 
@@ -283,57 +306,55 @@ export default function AdminManagerConsole({
     setIsTranslating(true);
     setTranslationError('');
 
-    let finalNameAr = pNameAr;
-    let finalNameEn = pNameEn;
-    let finalNameFr = pNameFr;
-    let finalNameIt = pNameIt;
+    let finalNameAr = '';
+    let finalNameEn = '';
+    let finalNameFr = '';
+    let finalNameIt = '';
 
-    let finalDescAr = pDescAr;
-    let finalDescEn = pDescEn;
-    let finalDescFr = pDescFr;
-    let finalDescIt = pDescIt;
-
-    const availableDesc = pDescAr || pDescEn || pDescFr || pDescIt;
+    let finalDescAr = '';
+    let finalDescEn = '';
+    let finalDescFr = '';
+    let finalDescIt = '';
 
     try {
-      const translateText = async (text: string, targetLang: string): Promise<string> => {
-        const response = await fetch('/api/translate', {
+      // 1. Translate Name into all languages
+      const nameRes = await fetch('/api/translate-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: singleProductName })
+      });
+      if (!nameRes.ok) throw new Error('Name translation failed');
+      const nameData = await nameRes.json();
+      finalNameAr = nameData.ar;
+      finalNameEn = nameData.en;
+      finalNameFr = nameData.fr;
+      finalNameIt = nameData.it;
+
+      // 2. Translate Description into all languages (if provided)
+      if (singleProductDesc.trim()) {
+        const descRes = await fetch('/api/translate-all', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, targetLang })
+          body: JSON.stringify({ text: singleProductDesc })
         });
-        if (!response.ok) throw new Error('Translation failed');
-        const data = await response.json();
-        return data.translation;
-      };
-
-      if (!pNameAr) finalNameAr = await translateText(availableName, 'ar');
-      if (!pNameEn) finalNameEn = await translateText(availableName, 'en');
-      if (!pNameFr) finalNameFr = await translateText(availableName, 'fr');
-      if (!pNameIt) finalNameIt = await translateText(availableName, 'it');
-
-      if (availableDesc) {
-        if (!pDescAr) finalDescAr = await translateText(availableDesc, 'ar');
-        if (!pDescEn) finalDescEn = await translateText(availableDesc, 'en');
-        if (!pDescFr) finalDescFr = await translateText(availableDesc, 'fr');
-        if (!pDescIt) finalDescIt = await translateText(availableDesc, 'it');
-      } else {
-        finalDescAr = '';
-        finalDescEn = '';
-        finalDescFr = '';
-        finalDescIt = '';
+        if (!descRes.ok) throw new Error('Description translation failed');
+        const descData = await descRes.json();
+        finalDescAr = descData.ar;
+        finalDescEn = descData.en;
+        finalDescFr = descData.fr;
+        finalDescIt = descData.it;
       }
     } catch (err) {
       console.error("Auto translate during save failed", err);
-      finalNameAr = finalNameAr || availableName;
-      finalNameEn = finalNameEn || availableName;
-      finalNameFr = finalNameFr || availableName;
-      finalNameIt = finalNameIt || availableName;
+      finalNameAr = singleProductName;
+      finalNameEn = singleProductName;
+      finalNameFr = singleProductName;
+      finalNameIt = singleProductName;
 
-      finalDescAr = finalDescAr || availableDesc || '';
-      finalDescEn = finalDescEn || availableDesc || '';
-      finalDescFr = finalDescFr || availableDesc || '';
-      finalDescIt = finalDescIt || availableDesc || '';
+      finalDescAr = singleProductDesc;
+      finalDescEn = singleProductDesc;
+      finalDescFr = singleProductDesc;
+      finalDescIt = singleProductDesc;
     } finally {
       setIsTranslating(false);
     }
@@ -365,22 +386,52 @@ export default function AdminManagerConsole({
   const handleSaveCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCatMessage(null);
-    if (!newCatNameAr || !newCatNameEn || !newCatNameFr || !newCatNameIt) {
+    if (!singleCatName.trim()) {
       setCatMessage({
-        text: currentLang === 'ar' ? 'الرجاء ملء جميع أسماء القسم بأربع لغات.' : 'Please fill all localized names.',
+        text: currentLang === 'ar' ? 'الرجاء إدخال اسم القسم.' : 'Please enter category name.',
         type: 'error'
       });
       return;
+    }
+
+    setIsTranslating(true);
+    setTranslationError('');
+
+    let finalCatNameAr = '';
+    let finalCatNameEn = '';
+    let finalCatNameFr = '';
+    let finalCatNameIt = '';
+
+    try {
+      const res = await fetch('/api/translate-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: singleCatName })
+      });
+      if (!res.ok) throw new Error('Category translation failed');
+      const data = await res.json();
+      finalCatNameAr = data.ar;
+      finalCatNameEn = data.en;
+      finalCatNameFr = data.fr;
+      finalCatNameIt = data.it;
+    } catch (err) {
+      console.error("Category auto translate failed", err);
+      finalCatNameAr = singleCatName;
+      finalCatNameEn = singleCatName;
+      finalCatNameFr = singleCatName;
+      finalCatNameIt = singleCatName;
+    } finally {
+      setIsTranslating(false);
     }
 
     if (editingCatId) {
       const res = await onUpdateCategory(
         editingCatId,
         {
-          ar: newCatNameAr,
-          en: newCatNameEn,
-          fr: newCatNameFr,
-          it: newCatNameIt
+          ar: finalCatNameAr,
+          en: finalCatNameEn,
+          fr: finalCatNameFr,
+          it: finalCatNameIt
         },
         newCatIcon
       );
@@ -388,6 +439,7 @@ export default function AdminManagerConsole({
       if (res.success) {
         setEditingCatId(null);
         setNewCatId('');
+        setSingleCatName('');
         setNewCatNameAr('');
         setNewCatNameEn('');
         setNewCatNameFr('');
@@ -415,16 +467,17 @@ export default function AdminManagerConsole({
       const res = await onAddCategory(
         formattedId,
         {
-          ar: newCatNameAr,
-          en: newCatNameEn,
-          fr: newCatNameFr,
-          it: newCatNameIt
+          ar: finalCatNameAr,
+          en: finalCatNameEn,
+          fr: finalCatNameFr,
+          it: finalCatNameIt
         },
         newCatIcon
       );
 
       if (res.success) {
         setNewCatId('');
+        setSingleCatName('');
         setNewCatNameAr('');
         setNewCatNameEn('');
         setNewCatNameFr('');
@@ -446,6 +499,8 @@ export default function AdminManagerConsole({
   const startEditCategory = (cat: CategoryItem) => {
     setEditingCatId(cat.id);
     setNewCatId(cat.id);
+    const initialName = cat.name[currentLang] || cat.name.en || cat.name.ar || cat.name.fr || cat.name.it || '';
+    setSingleCatName(initialName);
     setNewCatNameAr(cat.name.ar || '');
     setNewCatNameEn(cat.name.en || '');
     setNewCatNameFr(cat.name.fr || '');
@@ -457,6 +512,7 @@ export default function AdminManagerConsole({
   const cancelEditCategory = () => {
     setEditingCatId(null);
     setNewCatId('');
+    setSingleCatName('');
     setNewCatNameAr('');
     setNewCatNameEn('');
     setNewCatNameFr('');
@@ -481,18 +537,110 @@ export default function AdminManagerConsole({
     }
   };
 
-  const saveExclusiveOfferSubmit = (e: React.FormEvent) => {
+  const saveExclusiveOfferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!singleExcTitle.trim()) {
+      alert(currentLang === 'ar' ? 'يرجى كتابة عنوان العرض الحصري.' : 'Please enter exclusive offer title.');
+      return;
+    }
+
+    setIsTranslating(true);
+    setTranslationError('');
+
+    let finalTitleAr = '';
+    let finalTitleEn = '';
+    let finalTitleFr = '';
+    let finalTitleIt = '';
+
+    let finalDescAr = '';
+    let finalDescEn = '';
+    let finalDescFr = '';
+    let finalDescIt = '';
+
+    try {
+      // 1. Translate Title
+      const titleRes = await fetch('/api/translate-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: singleExcTitle })
+      });
+      if (!titleRes.ok) throw new Error('Title translation failed');
+      const titleData = await titleRes.json();
+      finalTitleAr = titleData.ar;
+      finalTitleEn = titleData.en;
+      finalTitleFr = titleData.fr;
+      finalTitleIt = titleData.it;
+
+      // 2. Translate Description
+      if (singleExcDesc.trim()) {
+        const descRes = await fetch('/api/translate-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: singleExcDesc })
+        });
+        if (!descRes.ok) throw new Error('Description translation failed');
+        const descData = await descRes.json();
+        finalDescAr = descData.ar;
+        finalDescEn = descData.en;
+        finalDescFr = descData.fr;
+        finalDescIt = descData.it;
+      }
+    } catch (err) {
+      console.error("Auto translate exclusive offer failed", err);
+      finalTitleAr = singleExcTitle;
+      finalTitleEn = singleExcTitle;
+      finalTitleFr = singleExcTitle;
+      finalTitleIt = singleExcTitle;
+
+      finalDescAr = singleExcDesc;
+      finalDescEn = singleExcDesc;
+      finalDescFr = singleExcDesc;
+      finalDescIt = singleExcDesc;
+    } finally {
+      setIsTranslating(false);
+    }
+
     const updated: ExclusiveOffer = {
       id: exclusiveOffer.id,
-      title: { ar: excTitleAr, en: excTitleEn, fr: excTitleFr, it: excTitleIt },
-      description: { ar: excDescAr, en: excDescEn, fr: excDescFr, it: excDescIt },
+      title: { ar: finalTitleAr, en: finalTitleEn, fr: finalTitleFr, it: finalTitleIt },
+      description: { ar: finalDescAr, en: finalDescEn, fr: finalDescFr, it: finalDescIt },
       discount: excDiscount,
       endTime: new Date(excEndTime).toISOString(),
       image: excImage,
       active: excActive
     };
     onSaveExclusiveOffer(updated);
+    setExcSavedMsg(true);
+    setTimeout(() => setExcSavedMsg(false), 3000);
+  };
+
+  const handleDeleteExclusiveOffer = () => {
+    if (!window.confirm(currentLang === 'ar' ? 'هل أنت متأكد من حذف وإيقاف العرض الحصري بالكامل؟' : 'Are you sure you want to delete and deactivate the exclusive offer completely?')) return;
+    const cleared: ExclusiveOffer = {
+      id: exclusiveOffer.id,
+      title: { ar: '', en: '', fr: '', it: '' },
+      description: { ar: '', en: '', fr: '', it: '' },
+      discount: '',
+      endTime: new Date().toISOString(),
+      image: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1200&q=80',
+      active: false
+    };
+    setExcTitleAr('');
+    setExcTitleEn('');
+    setExcTitleFr('');
+    setExcTitleIt('');
+    setExcDescAr('');
+    setExcDescEn('');
+    setExcDescFr('');
+    setExcDescIt('');
+    setSingleExcTitle('');
+    setSingleExcDesc('');
+    setExcDiscount('');
+    setExcEndTime(new Date().toISOString().substring(0, 16));
+    setExcImage('https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=1200&q=80');
+    setExcActive(false);
+
+    onSaveExclusiveOffer(cleared);
     setExcSavedMsg(true);
     setTimeout(() => setExcSavedMsg(false), 3000);
   };
@@ -508,24 +656,122 @@ export default function AdminManagerConsole({
     setWeeklyDescFr(w.description.fr);
     setWeeklyDescIt(w.description.it);
     setWeeklyDiscount(w.discount);
+    setWeeklyActive(w.active ?? true);
+
+    const initialTitle = w.title[currentLang] || w.title.en || w.title.ar || w.title.fr || w.title.it || '';
+    const initialDesc = w.description ? (w.description[currentLang] || w.description.en || w.description.ar || w.description.fr || w.description.it || '') : '';
+    setSingleWeeklyTitle(initialTitle);
+    setSingleWeeklyDesc(initialDesc);
   };
 
-  const saveWeeklyOfferSubmit = (e: React.FormEvent) => {
+  const saveWeeklyOfferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingWeeklyDay === null) return;
+    if (!singleWeeklyTitle.trim()) {
+      alert(currentLang === 'ar' ? 'يرجى كتابة عنوان العرض.' : 'Please write promo title.');
+      return;
+    }
+
+    setIsTranslating(true);
+    setTranslationError('');
+
+    let finalTitleAr = '';
+    let finalTitleEn = '';
+    let finalTitleFr = '';
+    let finalTitleIt = '';
+
+    let finalDescAr = '';
+    let finalDescEn = '';
+    let finalDescFr = '';
+    let finalDescIt = '';
+
+    try {
+      // 1. Translate Title
+      const titleRes = await fetch('/api/translate-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: singleWeeklyTitle })
+      });
+      if (!titleRes.ok) throw new Error('Title translation failed');
+      const titleData = await titleRes.json();
+      finalTitleAr = titleData.ar;
+      finalTitleEn = titleData.en;
+      finalTitleFr = titleData.fr;
+      finalTitleIt = titleData.it;
+
+      // 2. Translate Description
+      if (singleWeeklyDesc.trim()) {
+        const descRes = await fetch('/api/translate-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: singleWeeklyDesc })
+        });
+        if (!descRes.ok) throw new Error('Description translation failed');
+        const descData = await descRes.json();
+        finalDescAr = descData.ar;
+        finalDescEn = descData.en;
+        finalDescFr = descData.fr;
+        finalDescIt = descData.it;
+      }
+    } catch (err) {
+      console.error("Auto translate weekly offer failed", err);
+      finalTitleAr = singleWeeklyTitle;
+      finalTitleEn = singleWeeklyTitle;
+      finalTitleFr = singleWeeklyTitle;
+      finalTitleIt = singleWeeklyTitle;
+
+      finalDescAr = singleWeeklyDesc;
+      finalDescEn = singleWeeklyDesc;
+      finalDescFr = singleWeeklyDesc;
+      finalDescIt = singleWeeklyDesc;
+    } finally {
+      setIsTranslating(false);
+    }
+
     const updatedWeeklyList = weeklyOffers.map(w => {
       if (w.dayOfWeek === editingWeeklyDay) {
         return {
           ...w,
-          title: { ar: weeklyTitleAr, en: weeklyTitleEn, fr: weeklyTitleFr, it: weeklyTitleIt },
-          description: { ar: weeklyDescAr, en: weeklyDescEn, fr: weeklyDescFr, it: weeklyDescIt },
-          discount: weeklyDiscount
+          title: { ar: finalTitleAr, en: finalTitleEn, fr: finalTitleFr, it: finalTitleIt },
+          description: { ar: finalDescAr, en: finalDescEn, fr: finalDescFr, it: finalDescIt },
+          discount: weeklyDiscount,
+          active: weeklyActive
         };
       }
       return w;
     });
     onSaveWeeklyOffers(updatedWeeklyList);
     setEditingWeeklyDay(null);
+  };
+
+  const handleDeleteWeeklyOffer = (dayOfWeek: number) => {
+    if (!window.confirm(currentLang === 'ar' ? 'هل أنت متأكد من حذف وتعطيل هذا العرض الأسبوعي بالكامل؟' : 'Are you sure you want to delete and deactivate this weekly offer completely?')) return;
+    const updatedWeeklyList = weeklyOffers.map(w => {
+      if (w.dayOfWeek === dayOfWeek) {
+        return {
+          ...w,
+          title: { ar: '', en: '', fr: '', it: '' },
+          description: { ar: '', en: '', fr: '', it: '' },
+          discount: '',
+          active: false
+        };
+      }
+      return w;
+    });
+    onSaveWeeklyOffers(updatedWeeklyList);
+  };
+
+  const handleToggleWeeklyActive = (dayOfWeek: number, currentActive: boolean) => {
+    const updatedWeeklyList = weeklyOffers.map(w => {
+      if (w.dayOfWeek === dayOfWeek) {
+        return {
+          ...w,
+          active: !currentActive
+        };
+      }
+      return w;
+    });
+    onSaveWeeklyOffers(updatedWeeklyList);
   };
 
   const handleAddManagerSubmit = (e: React.FormEvent) => {
@@ -598,6 +844,30 @@ export default function AdminManagerConsole({
         >
           <Sparkles className="w-4 h-4" />
           {currentLang === 'ar' ? 'تعديل العروض الترويجية' : 'Offers & Promotions'}
+        </button>
+
+        <button
+          onClick={() => { setActiveTab('copilot'); }}
+          className={`flex items-center gap-2 py-3 px-4 text-xs font-bold transition-all whitespace-nowrap border-b-2 ${
+            activeTab === 'copilot'
+              ? 'border-brand-gold text-brand-gold'
+              : 'border-transparent text-gray-400 hover:text-brand-gold'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-brand-gold" />
+          {currentLang === 'ar' ? 'مساعد الذكاء الاصطناعي (AI Copilot)' : 'AI Copilot Assistant'}
+        </button>
+
+        <button
+          onClick={() => { setActiveTab('reviews'); }}
+          className={`flex items-center gap-2 py-3 px-4 text-xs font-bold transition-all whitespace-nowrap border-b-2 ${
+            activeTab === 'reviews'
+              ? 'border-brand-blue text-brand-blue'
+              : 'border-transparent text-gray-400 hover:text-brand-blue'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          {currentLang === 'ar' ? 'تعليقات وتقييمات العملاء' : 'Customer Reviews & Discussions'}
         </button>
 
         {isSuperAdmin && (
@@ -760,55 +1030,22 @@ export default function AdminManagerConsole({
                     )}
                   </div>
 
-                  {/* Multi-language Localized Names */}
-                  <div className="space-y-3 pt-2">
-                    <span className="block text-[10px] font-extrabold uppercase tracking-wider text-brand-blue">
-                      {currentLang === 'ar' ? 'اسم القسم بمختلف اللغات' : 'Section Name in Multiple Languages'}
-                    </span>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <input
-                          type="text"
-                          required
-                          value={newCatNameAr}
-                          onChange={(e) => setNewCatNameAr(e.target.value)}
-                          placeholder="العربية"
-                          className="w-full text-xs p-2.5 border border-gray-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-brand-blue"
-                          dir="rtl"
-                        />
-                      </div>
-                      <div>
-                        <input
-                          type="text"
-                          required
-                          value={newCatNameEn}
-                          onChange={(e) => setNewCatNameEn(e.target.value)}
-                          placeholder="English"
-                          className="w-full text-xs p-2.5 border border-gray-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-brand-blue"
-                        />
-                      </div>
-                      <div>
-                        <input
-                          type="text"
-                          required
-                          value={newCatNameFr}
-                          onChange={(e) => setNewCatNameFr(e.target.value)}
-                          placeholder="Français"
-                          className="w-full text-xs p-2.5 border border-gray-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-brand-blue"
-                        />
-                      </div>
-                      <div>
-                        <input
-                          type="text"
-                          required
-                          value={newCatNameIt}
-                          onChange={(e) => setNewCatNameIt(e.target.value)}
-                          placeholder="Italiano"
-                          className="w-full text-xs p-2.5 border border-gray-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-brand-blue"
-                        />
-                      </div>
-                    </div>
+                  {/* Single Section Name with automatic Translation */}
+                  <div className="space-y-1.5 pt-2">
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wider text-brand-blue">
+                      {currentLang === 'ar' ? 'اسم القسم (بأي لغة)' : 'Section Name (Any Language)'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={singleCatName}
+                      onChange={(e) => setSingleCatName(e.target.value)}
+                      placeholder={currentLang === 'ar' ? 'مثال: معجنات فرنسية، مشروبات ساخنة' : 'e.g. French Pastries, Hot Drinks'}
+                      className="w-full text-xs p-3 border border-gray-200 rounded-2xl bg-slate-50 focus:bg-white focus:outline-brand-blue"
+                    />
+                    <p className="text-[10px] text-gray-400">
+                      {currentLang === 'ar' ? '✨ سيقوم الموقع بترجمة اسم القسم تلقائياً لجميع اللغات عند الحفظ.' : '✨ The site will automatically translate the section name to all languages upon saving.'}
+                    </p>
                   </div>
 
                   {/* Icon Selector */}
@@ -1046,116 +1283,43 @@ export default function AdminManagerConsole({
                 </div>
               </div>
 
-              {/* Product Names (4 Languages) */}
+              {/* Product Name (Single Input with automatic Translation) */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center border-b border-gray-100 pb-1">
                   <h4 className="text-xs font-extrabold text-brand-blue tracking-wider uppercase">
-                    {currentLang === 'ar' ? 'اسم المنتج بجميع اللغات (يكفي ملء لغة واحدة والضغط على ترجمة)' : 'Product Name (Fill at least one language)'}
+                    {currentLang === 'ar' ? 'اسم المنتج (بأي لغة)' : 'Product Name (Any Language)'}
                   </h4>
-                  
-                  <button
-                    type="button"
-                    disabled={isTranslating}
-                    onClick={handleAutoTranslate}
-                    className="py-1 px-3 bg-brand-gold/20 hover:bg-brand-gold/30 disabled:bg-gray-100 text-brand-blue hover:text-brand-blue/90 text-[10px] font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span>✨</span>
-                    <span>{currentLang === 'ar' ? 'ترجمة تلقائية بالذكاء الاصطناعي' : '✨ Gemini Auto-Translate Blank Fields'}</span>
-                  </button>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-red mb-1">ARABIC (العربية)</label>
-                    <input
-                      type="text"
-                      value={pNameAr}
-                      onChange={(e) => setPNameAr(e.target.value)}
-                      placeholder="مثال: لازانيا دجاج بالكريمة"
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue text-right"
-                      dir="rtl"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ENGLISH</label>
-                    <input
-                      type="text"
-                      value={pNameEn}
-                      onChange={(e) => setPNameEn(e.target.value)}
-                      placeholder="e.g. Creamy Chicken Lasagna"
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">FRENCH (Français)</label>
-                    <input
-                      type="text"
-                      value={pNameFr}
-                      onChange={(e) => setPNameFr(e.target.value)}
-                      placeholder="ex: Lasagne de Poulet Crémeuse"
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ITALIAN (Italiano)</label>
-                    <input
-                      type="text"
-                      value={pNameIt}
-                      onChange={(e) => setPNameIt(e.target.value)}
-                      placeholder="es: Lasagna Cremosa al Pollo"
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                    />
-                  </div>
+                <div>
+                  <input
+                    type="text"
+                    value={singleProductName}
+                    onChange={(e) => setSingleProductName(e.target.value)}
+                    placeholder={currentLang === 'ar' ? 'مثال: لازانيا دجاج بالكريمة' : 'e.g. Creamy Chicken Lasagna'}
+                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {currentLang === 'ar' ? '✨ سيقوم الموقع بترجمة الاسم تلقائياً لجميع اللغات عند الحفظ.' : '✨ The site will automatically translate the name to all languages upon saving.'}
+                  </p>
                 </div>
               </div>
 
-              {/* Product Descriptions (4 Languages) */}
+              {/* Product Description (Single Textarea with automatic Translation) */}
               <div className="space-y-3">
                 <h4 className="text-xs font-extrabold text-brand-blue tracking-wider uppercase border-b border-gray-100 pb-1">
-                  {currentLang === 'ar' ? 'وصف المنتج ومكوناته بجميع اللغات' : 'Descriptions & Ingredients in All Languages'}
+                  {currentLang === 'ar' ? 'وصف ومكونات المنتج (بأي لغة)' : 'Product Description & Ingredients (Any Language)'}
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-red mb-1">ARABIC Description</label>
-                    <textarea
-                      value={pDescAr}
-                      onChange={(e) => setPDescAr(e.target.value)}
-                      rows={3}
-                      placeholder="مكونات الطبق والبهارات..."
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue text-right"
-                      dir="rtl"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ENGLISH Description</label>
-                    <textarea
-                      value={pDescEn}
-                      onChange={(e) => setPDescEn(e.target.value)}
-                      rows={3}
-                      placeholder="Premium ingredients, sauce details..."
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">FRENCH Description</label>
-                    <textarea
-                      value={pDescFr}
-                      onChange={(e) => setPDescFr(e.target.value)}
-                      rows={3}
-                      placeholder="Ingrédients nobles, sauce..."
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ITALIAN Description</label>
-                    <textarea
-                      value={pDescIt}
-                      onChange={(e) => setPDescIt(e.target.value)}
-                      rows={3}
-                      placeholder="Ingredienti freschi, condimento..."
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                    />
-                  </div>
+                <div>
+                  <textarea
+                    value={singleProductDesc}
+                    onChange={(e) => setSingleProductDesc(e.target.value)}
+                    rows={3}
+                    placeholder={currentLang === 'ar' ? 'مكونات الطبق والبهارات...' : 'Premium ingredients, sauce details...'}
+                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {currentLang === 'ar' ? '✨ سيقوم الموقع بترجمة الوصف تلقائياً لجميع اللغات عند الحفظ.' : '✨ The site will automatically translate the description to all languages upon saving.'}
+                  </p>
                 </div>
               </div>
 
@@ -1252,119 +1416,67 @@ export default function AdminManagerConsole({
               </div>
             </div>
 
-            {/* Multilingual Titles */}
-            <div className="space-y-3">
-              <h4 className="text-[10px] font-extrabold text-brand-blue uppercase tracking-wider border-b border-gray-100 pb-1">
-                Offer Title in All 4 Languages
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-brand-red mb-1">ARABIC TITLE *</label>
-                  <input
-                    type="text"
-                    value={excTitleAr}
-                    onChange={(e) => setExcTitleAr(e.target.value)}
-                    required
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue text-right"
-                    dir="rtl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-brand-blue mb-1">ENGLISH TITLE *</label>
-                  <input
-                    type="text"
-                    value={excTitleEn}
-                    onChange={(e) => setExcTitleEn(e.target.value)}
-                    required
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-brand-blue mb-1">FRENCH TITLE *</label>
-                  <input
-                    type="text"
-                    value={excTitleFr}
-                    onChange={(e) => setExcTitleFr(e.target.value)}
-                    required
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-brand-blue mb-1">ITALIAN TITLE *</label>
-                  <input
-                    type="text"
-                    value={excTitleIt}
-                    onChange={(e) => setExcTitleIt(e.target.value)}
-                    required
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                  />
-                </div>
+            {/* Title & Description with automatic background translation */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-brand-blue mb-1.5">
+                  {currentLang === 'ar' ? 'عنوان العرض الحصري (بأي لغة)' : 'Exclusive Offer Title (Any Language)'}
+                </label>
+                <input
+                  type="text"
+                  value={singleExcTitle}
+                  onChange={(e) => setSingleExcTitle(e.target.value)}
+                  required
+                  placeholder={currentLang === 'ar' ? 'مثال: خصم ٥٠٪ على وجبة العائلة' : 'e.g. 50% Off on Family Combo'}
+                  className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {currentLang === 'ar' ? '✨ سيقوم الموقع بترجمة العنوان تلقائياً لجميع اللغات عند الحفظ.' : '✨ The site will automatically translate the title to all languages upon saving.'}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-brand-blue mb-1.5">
+                  {currentLang === 'ar' ? 'وصف وتفاصيل العرض الحصري (بأي لغة)' : 'Exclusive Offer Description (Any Language)'}
+                </label>
+                <textarea
+                  value={singleExcDesc}
+                  onChange={(e) => setSingleExcDesc(e.target.value)}
+                  required
+                  rows={3}
+                  placeholder={currentLang === 'ar' ? 'تفاصيل العرض والشروط...' : 'Details of the offer, terms and conditions...'}
+                  className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {currentLang === 'ar' ? '✨ سيقوم الموقع بترجمة الوصف تلقائياً لجميع اللغات عند الحفظ.' : '✨ The site will automatically translate the description to all languages upon saving.'}
+                </p>
               </div>
             </div>
 
-            {/* Multilingual Descriptions */}
-            <div className="space-y-3">
-              <h4 className="text-[10px] font-extrabold text-brand-blue uppercase tracking-wider border-b border-gray-100 pb-1">
-                Offer Descriptions in All 4 Languages
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-brand-red mb-1">ARABIC DESCRIPTION *</label>
-                  <textarea
-                    value={excDescAr}
-                    onChange={(e) => setExcDescAr(e.target.value)}
-                    required
-                    rows={2}
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue text-right"
-                    dir="rtl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-brand-blue mb-1">ENGLISH DESCRIPTION *</label>
-                  <textarea
-                    value={excDescEn}
-                    onChange={(e) => setExcDescEn(e.target.value)}
-                    required
-                    rows={2}
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-brand-blue mb-1">FRENCH DESCRIPTION *</label>
-                  <textarea
-                    value={excDescFr}
-                    onChange={(e) => setExcDescFr(e.target.value)}
-                    required
-                    rows={2}
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-brand-blue mb-1">ITALIAN DESCRIPTION *</label>
-                  <textarea
-                    value={excDescIt}
-                    onChange={(e) => setExcDescIt(e.target.value)}
-                    required
-                    rows={2}
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                  />
-                </div>
+            <div className="flex flex-wrap justify-between items-center gap-4 pt-4 border-t border-gray-100">
+              <div>
+                {excSavedMsg ? (
+                  <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold animate-pulse">
+                    <Check className="w-4 h-4" /> {currentLang === 'ar' ? 'تم الحفظ بنجاح!' : 'Exclusive Offer saved successfully!'}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleDeleteExclusiveOffer}
+                    className="px-4 py-2.5 bg-brand-red/10 text-brand-red hover:bg-brand-red hover:text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {currentLang === 'ar' ? 'حذف وتعطيل العرض الحصري 🛑' : 'Delete & Deactivate Offer 🛑'}
+                  </button>
+                )}
               </div>
-            </div>
-
-            <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-              {excSavedMsg ? (
-                <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold">
-                  <Check className="w-4 h-4" /> Exclusive Offer saved successfully!
-                </div>
-              ) : <span></span>}
 
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-brand-gold text-brand-blue font-bold rounded-xl text-xs flex items-center gap-1 hover:bg-brand-gold/90 transition-all shadow-sm"
+                className="px-6 py-2.5 bg-brand-blue hover:bg-brand-blue/90 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
               >
                 <Check className="w-4 h-4" />
-                Update Exclusive Offer
+                {currentLang === 'ar' ? 'تحديث وحفظ العرض الحصري ✨' : 'Update & Save Exclusive Offer ✨'}
               </button>
             </div>
           </form>
@@ -1385,40 +1497,88 @@ export default function AdminManagerConsole({
                   return (
                     <div 
                       key={w.dayOfWeek}
-                      className={`p-5 rounded-2xl border transition-all duration-300 relative ${
+                      className={`p-5 rounded-2xl border transition-all duration-300 relative flex flex-col justify-between ${
                         isToday 
                           ? 'bg-brand-blue/5 border-brand-gold shadow-md scale-[1.01]' 
                           : 'bg-white border-gray-100 hover:border-gray-300'
-                      }`}
+                      } ${w.active === false ? 'opacity-60 bg-slate-50' : ''}`}
                     >
-                      {isToday && (
-                        <span className="absolute top-3 right-3 px-2 py-0.5 bg-brand-gold text-brand-blue font-bold text-[8px] tracking-wider rounded font-mono uppercase animate-pulse">
-                          TODAY'S SPECIAL
-                        </span>
-                      )}
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold text-gray-400 font-mono">
+                            {t.days[w.dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6].toUpperCase()}
+                          </span>
 
-                      <span className="text-[10px] font-bold text-gray-400 font-mono">
-                        {t.days[w.dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6].toUpperCase()}
-                      </span>
+                          <div className="flex items-center gap-1.5">
+                            {isToday && w.active !== false && (
+                              <span className="px-2 py-0.5 bg-brand-gold text-brand-blue font-bold text-[8px] tracking-wider rounded font-mono uppercase animate-pulse">
+                                TODAY
+                              </span>
+                            )}
+                            {w.active !== false && w.title.en ? (
+                              <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-black text-[8px] rounded uppercase font-mono">
+                                {currentLang === 'ar' ? 'نشط' : 'ACTIVE'}
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 bg-rose-100 text-rose-800 font-black text-[8px] rounded uppercase font-mono">
+                                {currentLang === 'ar' ? 'معطل / فارغ' : 'INACTIVE'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-                      <h4 className="serif-heading font-bold text-brand-blue text-sm mt-1">
-                        {w.title[currentLang] || w.title.en}
-                      </h4>
+                        <h4 className="serif-heading font-bold text-brand-blue text-sm mt-1.5">
+                          {w.title[currentLang] || w.title.en || (currentLang === 'ar' ? 'لا يوجد عرض مضاف' : 'No promo specified')}
+                        </h4>
 
-                      <div className="text-[11px] text-brand-red font-mono font-bold mt-1">
-                        Offer: {w.discount}
+                        <div className="text-[11px] text-brand-red font-mono font-bold mt-1">
+                          {currentLang === 'ar' ? 'العرض: ' : 'Offer: '} {w.discount || (currentLang === 'ar' ? 'لا يوجد' : 'None')}
+                        </div>
+
+                        <p className="text-gray-500 text-[11px] leading-relaxed mt-2 line-clamp-2">
+                          {w.description[currentLang] || w.description.en || (currentLang === 'ar' ? 'اضغط على تعديل لتفعيل وإضافة عرض مخصص.' : 'Click edit to configure.')}
+                        </p>
                       </div>
 
-                      <p className="text-gray-500 text-[11px] leading-relaxed mt-2 line-clamp-2">
-                        {w.description[currentLang] || w.description.en}
-                      </p>
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <button
+                          onClick={() => startEditWeekly(w)}
+                          className="text-[11px] font-bold text-brand-blue hover:text-brand-gold flex items-center gap-1 py-1 px-2 hover:bg-slate-50 rounded-lg transition-all"
+                        >
+                          <Edit className="w-3.5 h-3.5" /> 
+                          {currentLang === 'ar' ? 'تعديل ✍️' : 'Edit Promo ✍️'}
+                        </button>
 
-                      <button
-                        onClick={() => startEditWeekly(w)}
-                        className="mt-4 text-[10px] font-bold text-brand-gold underline hover:text-brand-blue flex items-center gap-1"
-                      >
-                        <Edit className="w-3 h-3" /> Edit Promo
-                      </button>
+                        {(w.title.en || w.discount) ? (
+                          <div className="flex items-center gap-1">
+                            {w.active !== false ? (
+                              <button
+                                onClick={() => handleToggleWeeklyActive(w.dayOfWeek, true)}
+                                className="text-[10px] font-bold text-amber-600 hover:text-amber-800 py-1 px-1.5 hover:bg-amber-50 rounded-lg transition-all"
+                                title={currentLang === 'ar' ? 'تعطيل مؤقت' : 'Disable temporarily'}
+                              >
+                                {currentLang === 'ar' ? 'تعطيل' : 'Pause'}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleToggleWeeklyActive(w.dayOfWeek, false)}
+                                className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 py-1 px-1.5 hover:bg-emerald-50 rounded-lg transition-all"
+                                title={currentLang === 'ar' ? 'تفعيل العرض' : 'Enable Promo'}
+                              >
+                                {currentLang === 'ar' ? 'تفعيل' : 'Resume'}
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => handleDeleteWeeklyOffer(w.dayOfWeek)}
+                              className="text-[10px] font-bold text-brand-red hover:text-red-700 py-1 px-1.5 hover:bg-red-50 rounded-lg transition-all flex items-center"
+                              title={currentLang === 'ar' ? 'حذف العرض وتصفيره' : 'Delete and reset'}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   );
                 })}
@@ -1428,115 +1588,80 @@ export default function AdminManagerConsole({
               <form onSubmit={saveWeeklyOfferSubmit} className="p-6 border border-brand-gold/30 rounded-2xl bg-slate-50/50 space-y-4">
                 <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                   <h4 className="serif-heading font-bold text-brand-blue">
-                    Edit Recurring Special for: <span className="text-brand-red">{t.days[editingWeeklyDay as 0 | 1 | 2 | 3 | 4 | 5 | 6]}</span>
+                    {currentLang === 'ar' ? `تعديل العرض المميز ليوم: ` : `Edit Recurring Special for: `}
+                    <span className="text-brand-red">{t.days[editingWeeklyDay as 0 | 1 | 2 | 3 | 4 | 5 | 6]}</span>
                   </h4>
                   <button
                     type="button"
                     onClick={() => setEditingWeeklyDay(null)}
                     className="text-xs text-gray-400 hover:text-gray-600 underline"
                   >
-                    Cancel
+                    {t.cancel}
                   </button>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-brand-blue mb-1">Discount Tag (e.g. Free Dessert, 10% OFF)</label>
-                  <input
-                    type="text"
-                    value={weeklyDiscount}
-                    onChange={(e) => setWeeklyDiscount(e.target.value)}
-                    required
-                    className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue font-mono font-bold"
-                  />
-                </div>
-
-                {/* Multilingual Titles */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-red mb-1">ARABIC TITLE *</label>
+                    <label className="block text-[10px] font-bold text-brand-blue mb-1">
+                      {currentLang === 'ar' ? 'وسم الخصم (مثل: حلويات مجانية، خصم ١٠٪)' : 'Discount Tag (e.g. Free Dessert, 10% OFF)'}
+                    </label>
                     <input
                       type="text"
-                      value={weeklyTitleAr}
-                      onChange={(e) => setWeeklyTitleAr(e.target.value)}
+                      value={weeklyDiscount}
+                      onChange={(e) => setWeeklyDiscount(e.target.value)}
                       required
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue text-right"
-                      dir="rtl"
+                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue font-mono font-bold"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ENGLISH TITLE *</label>
+
+                  <div className="flex items-center gap-2 bg-white/50 p-3 rounded-xl border border-gray-100 self-end h-11">
                     <input
-                      type="text"
-                      value={weeklyTitleEn}
-                      onChange={(e) => setWeeklyTitleEn(e.target.value)}
-                      required
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
+                      type="checkbox"
+                      id="weekly-active-checkbox"
+                      checked={weeklyActive}
+                      onChange={(e) => setWeeklyActive(e.target.checked)}
+                      className="w-4 h-4 text-brand-blue rounded focus:ring-0 cursor-pointer"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">FRENCH TITLE *</label>
-                    <input
-                      type="text"
-                      value={weeklyTitleFr}
-                      onChange={(e) => setWeeklyTitleFr(e.target.value)}
-                      required
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ITALIAN TITLE *</label>
-                    <input
-                      type="text"
-                      value={weeklyTitleIt}
-                      onChange={(e) => setWeeklyTitleIt(e.target.value)}
-                      required
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                    />
+                    <label htmlFor="weekly-active-checkbox" className="text-xs font-bold text-brand-blue cursor-pointer select-none">
+                      {currentLang === 'ar' ? 'العرض نشط ويظهر للعملاء حالياً 🟢' : 'Promo is Active & Visible 🟢'}
+                    </label>
                   </div>
                 </div>
 
-                {/* Multilingual Descriptions */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Title & Description with automatic background translation */}
+                <div className="space-y-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-red mb-1">ARABIC DESCRIPTION *</label>
-                    <textarea
-                      value={weeklyDescAr}
-                      onChange={(e) => setWeeklyDescAr(e.target.value)}
+                    <label className="block text-xs font-bold text-brand-blue mb-1.5">
+                      {currentLang === 'ar' ? 'عنوان العرض (بأي لغة)' : 'Offer Title (Any Language)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={singleWeeklyTitle}
+                      onChange={(e) => setSingleWeeklyTitle(e.target.value)}
                       required
-                      rows={2}
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue text-right"
-                      dir="rtl"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ENGLISH DESCRIPTION *</label>
-                    <textarea
-                      value={weeklyDescEn}
-                      onChange={(e) => setWeeklyDescEn(e.target.value)}
-                      required
-                      rows={2}
+                      placeholder={currentLang === 'ar' ? 'مثال: عرض المعكرونة الرائع' : 'e.g. Pasta Special Night'}
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
                     />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {currentLang === 'ar' ? '✨ سيقوم الموقع بترجمة العنوان تلقائياً لجميع اللغات عند الحفظ.' : '✨ The site will automatically translate the title to all languages upon saving.'}
+                    </p>
                   </div>
+
                   <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">FRENCH DESCRIPTION *</label>
+                    <label className="block text-xs font-bold text-brand-blue mb-1.5">
+                      {currentLang === 'ar' ? 'وصف وتفاصيل العرض (بأي لغة)' : 'Offer Description (Any Language)'}
+                    </label>
                     <textarea
-                      value={weeklyDescFr}
-                      onChange={(e) => setWeeklyDescFr(e.target.value)}
+                      value={singleWeeklyDesc}
+                      onChange={(e) => setSingleWeeklyDesc(e.target.value)}
                       required
-                      rows={2}
+                      rows={3}
+                      placeholder={currentLang === 'ar' ? 'تفاصيل العرض...' : 'Details of the offer...'}
                       className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-brand-blue mb-1">ITALIAN DESCRIPTION *</label>
-                    <textarea
-                      value={weeklyDescIt}
-                      onChange={(e) => setWeeklyDescIt(e.target.value)}
-                      required
-                      rows={2}
-                      className="w-full text-xs p-3 border border-gray-200 rounded-xl bg-white focus:outline-brand-blue"
-                    />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {currentLang === 'ar' ? '✨ سيقوم الموقع بترجمة الوصف تلقائياً لجميع اللغات عند الحفظ.' : '✨ The site will automatically translate the description to all languages upon saving.'}
+                    </p>
                   </div>
                 </div>
 
@@ -1546,13 +1671,14 @@ export default function AdminManagerConsole({
                     onClick={() => setEditingWeeklyDay(null)}
                     className="px-4 py-2 border border-gray-200 text-gray-500 font-bold rounded-xl text-xs"
                   >
-                    Cancel
+                    {t.cancel}
                   </button>
                   <button
                     type="submit"
                     className="px-5 py-2 bg-brand-blue text-white font-bold rounded-xl text-xs flex items-center gap-1 hover:bg-brand-blue/90"
                   >
-                    <Check className="w-3.5 h-3.5" /> Save Day Special
+                    <Check className="w-3.5 h-3.5" /> 
+                    {currentLang === 'ar' ? 'حفظ وتحديث العرض' : 'Save Day Special'}
                   </button>
                 </div>
               </form>
@@ -1691,6 +1817,28 @@ export default function AdminManagerConsole({
             </div>
           </div>
         </div>
+      )}
+
+      {/* AI Copilot Tab */}
+      {activeTab === 'copilot' && (
+        <div className="space-y-6">
+          <AICopilotConsole
+            currentLang={currentLang}
+            currentUserEmail={currentUserEmail}
+            currentUserRole={isSuperAdmin ? 'Developer' : 'Manager'}
+            onDatabaseMutated={onDatabaseMutated}
+          />
+        </div>
+      )}
+
+      {/* Customer Reviews & Moderation Tab */}
+      {activeTab === 'reviews' && (
+        <ReviewsManagerTab
+          currentLang={currentLang}
+          currentUserEmail={currentUserEmail}
+          isSuperAdmin={isSuperAdmin}
+          managers={managers}
+        />
       )}
 
       {/* CONFIRM DELETE SINGLE PRODUCT MODAL (iframe-safe) */}

@@ -72,7 +72,7 @@ export default function LanguageLandingScreen({
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-[#0B0F19] text-[#FDFBF7] flex flex-col items-center justify-center p-4 overflow-hidden" 
+      className="fixed inset-0 z-50 bg-[#0B0F19] text-[#FDFBF7] overflow-y-auto flex flex-col items-center justify-start md:justify-center py-6 px-4 sm:px-6 md:py-12" 
       id="language-landing-container"
     >
       {/* Decorative Radial Background */}
@@ -89,7 +89,7 @@ export default function LanguageLandingScreen({
           repeat: Infinity, 
           ease: "easeInOut" 
         }}
-        className="absolute w-[450px] h-[450px] rounded-full blur-[140px] pointer-events-none z-0 transition-colors duration-1000"
+        className="absolute w-[300px] sm:w-[450px] h-[300px] sm:h-[450px] rounded-full blur-[100px] sm:blur-[140px] pointer-events-none z-0 transition-colors duration-1000"
         style={{
           backgroundColor: selectedHighlight.ambientGlow,
           top: '35%',
@@ -141,14 +141,14 @@ export default function LanguageLandingScreen({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
-        className="w-full max-w-2xl flex flex-col items-center relative z-10 text-center px-4"
+        className="w-full max-w-2xl flex flex-col items-center relative z-10 text-center px-2 my-auto"
       >
         {/* Luxury Badge */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1, duration: 0.6 }}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/5 border border-amber-400/20 backdrop-blur-md text-[10px] uppercase tracking-[0.2em] text-amber-400 font-bold mb-6 shadow-xl"
+          className="inline-flex items-center gap-1.5 px-4 py-1.5 sm:py-2 rounded-full bg-white/5 border border-amber-400/20 backdrop-blur-md text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-amber-400 font-bold mb-4 sm:mb-6 shadow-xl"
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
           French Touch • Paris • Rome • Cairo
@@ -159,18 +159,18 @@ export default function LanguageLandingScreen({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.6 }}
-          className="mb-6 scale-110 md:scale-125"
+          className="mb-4 sm:mb-6 scale-95 sm:scale-110 md:scale-125"
         >
           <RestaurantLogo light />
         </motion.div>
 
         {/* Dynamic Welcoming Header Box - motivating & engaging */}
-        <div className="min-h-[140px] md:min-h-[160px] flex flex-col items-center justify-center mb-8 px-4 w-full">
+        <div className="min-h-[100px] sm:min-h-[140px] md:min-h-[160px] flex flex-col items-center justify-center mb-4 sm:mb-8 px-4 w-full">
           <motion.span 
             key={`${currentLang}-badge`}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 0.8, y: 0 }}
-            className="text-[11px] font-bold tracking-widest text-amber-400 uppercase mb-2 font-mono"
+            className="text-[10px] sm:text-[11px] font-bold tracking-widest text-amber-400 uppercase mb-1 sm:mb-2 font-mono"
           >
             ⚜️ {selectedHighlight.badge} ⚜️
           </motion.span>
@@ -179,7 +179,7 @@ export default function LanguageLandingScreen({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", stiffness: 100 }}
-            className="serif-heading text-3xl md:text-4xl font-extrabold text-[#FDFBF7] tracking-tight mb-3 text-transparent bg-clip-text bg-gradient-to-b from-[#FFFDF9] to-[#E2DFD9]"
+            className="serif-heading text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#FDFBF7] tracking-tight mb-2 sm:mb-3 text-transparent bg-clip-text bg-gradient-to-b from-[#FFFDF9] to-[#E2DFD9]"
           >
             {selectedHighlight.greeting}
           </motion.h1>
@@ -187,26 +187,25 @@ export default function LanguageLandingScreen({
             key={`${currentLang}-desc`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-stone-300 text-sm md:text-base max-w-lg leading-relaxed font-medium"
+            className="text-stone-300 text-xs sm:text-sm md:text-base max-w-lg leading-relaxed font-medium animate-in fade-in duration-500"
           >
             {selectedHighlight.desc}
           </motion.p>
         </div>
 
         {/* Clean, Simple Language Grid - No complex forms, just 4 elegant buttons */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-xl mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full max-w-xl mb-6 sm:mb-8">
           {LANGUAGES.map((lang) => {
             const isSelected = currentLang === lang.code;
-            const hl = languageHighlights[lang.code];
             
             return (
               <button
                 key={lang.code}
                 onClick={() => onSelectLanguage(lang.code)}
                 id={`lang-select-${lang.code}`}
-                className={`flex flex-col items-center justify-between p-4 rounded-2xl text-center transition-all duration-300 transform active:scale-95 border cursor-pointer relative group ${
+                className={`flex flex-col items-center justify-between p-3 sm:p-4 rounded-2xl text-center transition-all duration-300 transform active:scale-95 border cursor-pointer relative group ${
                   isSelected
-                    ? 'bg-gradient-to-b from-white/10 to-white/5 text-amber-300 shadow-xl border-amber-400 scale-[1.05]'
+                    ? 'bg-gradient-to-b from-white/10 to-white/5 text-amber-300 shadow-xl border-amber-400 scale-[1.03]'
                     : 'bg-white/[0.03] hover:bg-white/[0.07] text-[#FDFBF7] border-white/5 hover:border-white/10'
                 }`}
               >
@@ -219,12 +218,12 @@ export default function LanguageLandingScreen({
                 )}
 
                 {/* Country Flag Circle */}
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl bg-white/5 mb-3 border border-white/10 group-hover:scale-110 transition-transform ${isSelected ? 'border-amber-400/40 bg-white/10' : ''}`}>
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl sm:text-2xl bg-white/5 mb-2 sm:mb-3 border border-white/10 group-hover:scale-110 transition-transform ${isSelected ? 'border-amber-400/40 bg-white/10' : ''}`}>
                   {lang.flag}
                 </div>
 
                 <div className="flex flex-col items-center">
-                  <span className="text-xs font-bold font-mono tracking-widest text-stone-400 group-hover:text-amber-300 transition-colors">
+                  <span className="text-[10px] sm:text-xs font-bold font-mono tracking-widest text-stone-400 group-hover:text-amber-300 transition-colors">
                     {lang.code.toUpperCase()}
                   </span>
                   <span className="text-xs font-bold mt-1">
@@ -242,14 +241,14 @@ export default function LanguageLandingScreen({
           whileTap={{ scale: 0.98 }}
           onClick={handleEnter}
           id="enter-restaurant-btn"
-          className="w-full max-w-md py-4.5 px-8 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-stone-950 font-black rounded-2xl text-sm shadow-2xl shadow-amber-500/10 flex items-center justify-center gap-2 transition-all cursor-pointer border border-amber-400/30"
+          className="w-full max-w-md py-3.5 sm:py-4 px-6 sm:px-8 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-stone-950 font-black rounded-2xl text-xs sm:text-sm shadow-2xl shadow-amber-500/10 flex items-center justify-center gap-2 transition-all cursor-pointer border border-amber-400/30"
         >
-          <span className="tracking-wide">{selectedHighlight.action}</span>
-          <ArrowRight className={`w-4 h-4 transition-transform ${currentLang === 'ar' ? 'rotate-180' : ''}`} />
+          <span className="tracking-wide font-black">{selectedHighlight.action}</span>
+          <ArrowRight className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${currentLang === 'ar' ? 'rotate-180' : ''}`} />
         </motion.button>
 
         {/* Small motivational subtext */}
-        <p className="mt-4 text-[10px] text-stone-500 tracking-wider">
+        <p className="mt-4 text-[9px] sm:text-[10px] text-stone-500 tracking-wider">
           {currentLang === 'ar' ? 'أجواء مذهلة، خدمة راقية، وأطباق تحبس الأنفاس بانتظارك' :
            currentLang === 'fr' ? 'Une ambiance incroyable, un service raffiné et des plats d’exception vous attendent' :
            currentLang === 'it' ? 'Un’atmosfera incredibile, un servizio raffinato e piatti eccezionali ti aspettano' :
@@ -257,7 +256,7 @@ export default function LanguageLandingScreen({
         </p>
 
         {/* Footer Concept Accent */}
-        <div className="mt-12 text-[10px] font-mono text-stone-500 tracking-[0.2em] uppercase flex items-center gap-3">
+        <div className="mt-6 sm:mt-12 text-[9px] sm:text-[10px] font-mono text-stone-500 tracking-[0.2em] uppercase flex items-center gap-2.5 sm:gap-3">
           <span>Paris</span>
           <span className="text-amber-500/60">•</span>
           <span>Roma</span>

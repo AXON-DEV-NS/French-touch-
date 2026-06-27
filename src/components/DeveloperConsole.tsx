@@ -7,6 +7,7 @@ import {
   ShieldAlert, ShieldCheck
 } from "lucide-react";
 import { Language, TRANSLATIONS, Manager } from "../types";
+import AICopilotConsole from "./AICopilotConsole";
 
 interface VisitorLog {
   email: string;
@@ -28,6 +29,11 @@ interface RegisteredCustomer {
   email: string;
   picture: string;
   registeredAt: string;
+  aiAnalysis?: {
+    culinaryMood: string;
+    personalityAnalysis: string;
+    recommendedDish: string;
+  };
 }
 
 interface EmailLog {
@@ -45,6 +51,7 @@ interface DeveloperConsoleProps {
   // State switches to allow the developer to preview other states
   previewRole: "Developer" | "Manager" | "Customer";
   setPreviewRole: (role: "Developer" | "Manager" | "Customer") => void;
+  onDatabaseMutated?: (updatedData: any) => void;
 }
 
 export default function DeveloperConsole({
@@ -52,7 +59,8 @@ export default function DeveloperConsole({
   currentUser,
   onLogout,
   previewRole,
-  setPreviewRole
+  setPreviewRole,
+  onDatabaseMutated
 }: DeveloperConsoleProps) {
   const t = TRANSLATIONS[currentLang];
   const isRtl = currentLang === "ar";
@@ -76,7 +84,7 @@ export default function DeveloperConsole({
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [loadingManagers, setLoadingManagers] = useState(false);
   const [pageViews, setPageViews] = useState(0);
-  const [activeConsoleTab, setActiveConsoleTab] = useState<"logs" | "gmails" | "subscribers" | "customers" | "emaillogs">("customers");
+  const [activeConsoleTab, setActiveConsoleTab] = useState<"logs" | "gmails" | "subscribers" | "customers" | "emaillogs" | "copilot">("copilot");
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // Fetch visitors and managers from full-stack server
@@ -398,7 +406,7 @@ export default function DeveloperConsole({
               ? "بصفتك المطور، يمكنك الانتقال فوراً بين الشاشات لتجربة شاشة المدير أو شاشة الزبون العادي دون الحاجة لتسجيل الخروج بحسابات أخرى."
               : "As the developer, you can dynamically switch between user roles to test how the manager or regular customer views look and behave instantly."}
           </p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button
               onClick={() => setPreviewRole("Developer")}
               className={`py-3 px-4 rounded-xl text-xs font-black transition-all cursor-pointer ${
@@ -640,6 +648,17 @@ export default function DeveloperConsole({
                 {/* Visual Tab Buttons */}
                 <div className="flex gap-2.5 mt-3 border-b border-stone-800/20 pb-1 flex-wrap">
                   <button
+                    onClick={() => setActiveConsoleTab("copilot")}
+                    className={`pb-1 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1 ${
+                      activeConsoleTab === "copilot" 
+                        ? "border-brand-gold text-brand-gold font-black" 
+                        : "border-transparent text-stone-400 hover:text-brand-gold"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-brand-gold" />
+                    <span>{currentLang === "ar" ? "🤖 المساعد الذكي (AI Copilot)" : "🤖 AI Copilot"}</span>
+                  </button>
+                  <button
                     onClick={() => setActiveConsoleTab("customers")}
                     className={`pb-1 text-xs font-bold border-b-2 transition-all cursor-pointer ${
                       activeConsoleTab === "customers" 
@@ -702,6 +721,38 @@ export default function DeveloperConsole({
                 </button>
               )}
             </div>
+
+            {/* TAB CONTENT: AI COPILOT CONTROL (FULL HANDS-FREE CONTROL) */}
+            {activeConsoleTab === "copilot" && (
+              <div className="p-4 space-y-4">
+                <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl">
+                  <p className="text-xs text-amber-400 leading-relaxed font-sans font-bold flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 animate-pulse shrink-0 text-brand-gold" />
+                    <span>
+                      {currentLang === "ar" 
+                        ? "صلاحية تحكم مطور مطلقة: يمكنك توجيه المساعد الذكي لتنفيذ تعديلات لحظية ومباشرة على قاعدة بيانات المنتجات والعروض والمستخدمين والتقييمات بالكامل."
+                        : "Developer Ultimate Authority: Direct the executive AI to run instant master mutations on all products, offers, categories, customers, and review databases."}
+                    </span>
+                  </p>
+                </div>
+                <AICopilotConsole
+                  currentLang={currentLang as any}
+                  currentUserEmail={currentUser.email}
+                  currentUserRole="Developer"
+                  onDatabaseMutated={(updatedData) => {
+                    if (onDatabaseMutated) {
+                      onDatabaseMutated(updatedData);
+                    }
+                    if (updatedData.registeredCustomers) {
+                      setCustomers(updatedData.registeredCustomers);
+                    }
+                    if (updatedData.blockedCustomers) {
+                      setBlockedCustomers(updatedData.blockedCustomers);
+                    }
+                  }}
+                />
+              </div>
+            )}
 
             {/* TAB CONTENT: REGISTERED CUSTOMERS (REQUIRED BY USER) */}
             {activeConsoleTab === "customers" && (
