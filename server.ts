@@ -71,6 +71,8 @@ interface RegisteredCustomer {
   email: string;
   picture: string; // base64 or URL
   registeredAt: string;
+  blockReason?: string;
+  warningMessage?: string;
   aiAnalysis?: {
     culinaryMood: string;
     personalityAnalysis: string;
@@ -951,18 +953,19 @@ app.post("/api/auth/login-existing-customer", async (req, res) => {
 
   const db = await readDb();
   const customers = db.registeredCustomers || [];
+  const blocked = db.blockedCustomers || [];
+
+  // Check if they are blocked first
+  const blockedCustomer = blocked.find(b => b.email.trim().toLowerCase() === cleanEmail);
+  if (blockedCustomer) {
+    const reasonMsg = blockedCustomer.blockReason ? `\nالسبب: ${blockedCustomer.blockReason}` : "";
+    return res.status(403).json({ error: `تم حظر هذا الحساب نهائياً من قبل الإدارة لمخالفته القوانين والأنظمة.${reasonMsg}` });
+  }
 
   // Find the customer by email
   const customer = customers.find(c => c.email.toLowerCase() === cleanEmail);
   if (!customer) {
     return res.status(404).json({ error: "لم يتم العثور على أي حساب مسجل بهذا البريد الإلكتروني. يرجى مراجعة البريد أو إنشاء حساب جديد." });
-  }
-
-  // Check if they are blocked
-  const blocked = db.blockedCustomers || [];
-  const isBlocked = blocked.some(b => b.email.trim().toLowerCase() === cleanEmail);
-  if (isBlocked) {
-    return res.status(403).json({ error: "تم حظر هذا الحساب نهائياً من قبل الإدارة لمخالفته القوانين والأنظمة." });
   }
 
   // Verify Phone match
@@ -1032,7 +1035,7 @@ app.get("/api/blocked-customers", requireDeveloper, async (req, res) => {
 });
 
 app.post("/api/block-customer", requireDeveloper, async (req, res) => {
-  const { email } = req.body;
+  const { email, blockReason } = req.body;
   if (!email) {
     return res.status(400).json({ error: "Email is required to block a customer." });
   }
@@ -1046,6 +1049,9 @@ app.post("/api/block-customer", requireDeveloper, async (req, res) => {
   }
 
   const [customerToBlock] = db.registeredCustomers!.splice(customerIndex, 1);
+  if (blockReason) {
+    customerToBlock.blockReason = blockReason;
+  }
 
   if (!db.blockedCustomers) db.blockedCustomers = [];
   if (!db.blockedCustomers.some(b => b.email.toLowerCase() === cleanEmail)) {
@@ -1054,6 +1060,38 @@ app.post("/api/block-customer", requireDeveloper, async (req, res) => {
 
   await writeDb(db);
   res.json({ success: true, registeredCustomers: db.registeredCustomers, blockedCustomers: db.blockedCustomers });
+});
+
+app.post("/api/warn-customer", requireDeveloper, async (req, res) => {
+  const { email, warningMessage } = req.body;
+  if (!email || !warningMessage) {
+    return res.status(400).json({ error: "Email and warning message are required." });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const db = await readDb();
+
+  const customer = (db.registeredCustomers || []).find(c => c.email.toLowerCase() === cleanEmail);
+  if (!customer) {
+    return res.status(404).json({ error: "لم يتم العثور على هذا العميل." });
+  }
+
+  customer.warningMessage = warningMessage;
+  await writeDb(db);
+  res.json({ success: true, registeredCustomers: db.registeredCustomers });
+});
+
+app.post("/api/unwarn-customer", requireDeveloper, async (req, res) => {
+  const { email } = req.body;
+  const cleanEmail = email.trim().toLowerCase();
+  const db = await readDb();
+
+  const customer = (db.registeredCustomers || []).find(c => c.email.toLowerCase() === cleanEmail);
+  if (customer) {
+    delete customer.warningMessage;
+    await writeDb(db);
+  }
+  res.json({ success: true, registeredCustomers: db.registeredCustomers });
 });
 
 app.post("/api/unblock-customer", requireDeveloper, async (req, res) => {

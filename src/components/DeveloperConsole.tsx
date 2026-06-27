@@ -145,6 +145,7 @@ export default function DeveloperConsole({
     if (!window.confirm(currentLang === "ar" ? "هل أنت متأكد من حظر هذا العميل نهائياً ومنع تسجيله مجدداً بمعلومات مشابهة؟" : "Are you sure you want to ban this customer permanently?")) {
       return;
     }
+    const blockReason = window.prompt(currentLang === "ar" ? "ما هو سبب الحظر؟ (اختياري، سيظهر للعميل عند محاولة الدخول)" : "Reason for block? (Optional, will be shown to customer)");
     setMessage(null);
     try {
       const res = await fetch("/api/block-customer", {
@@ -154,7 +155,7 @@ export default function DeveloperConsole({
           "x-user-email": currentUser.email,
           "x-user-role": currentUser.role
         },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, blockReason })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to block customer");
@@ -162,6 +163,32 @@ export default function DeveloperConsole({
       setBlockedCustomers(data.blockedCustomers || []);
       setMessage({
         text: currentLang === "ar" ? "تم حظر هذا العميل نهائياً ومنع تسجيله مستقبلاً بنجاح!" : "Customer blocked and banned permanently!",
+        type: "success"
+      });
+    } catch (err: any) {
+      setMessage({ text: err.message, type: "error" });
+    }
+  };
+
+  const handleWarnCustomer = async (email: string) => {
+    const warningMessage = window.prompt(currentLang === "ar" ? "أدخل نص التحذير ليتم عرضه للعميل عند تسجيل الدخول:" : "Enter warning message to show to the customer on login:");
+    if (!warningMessage) return;
+    setMessage(null);
+    try {
+      const res = await fetch("/api/warn-customer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": currentUser.email,
+          "x-user-role": currentUser.role
+        },
+        body: JSON.stringify({ email, warningMessage })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to warn customer");
+      setCustomers(data.registeredCustomers || []);
+      setMessage({
+        text: currentLang === "ar" ? "تم إرسال التحذير بنجاح!" : "Warning sent successfully!",
         type: "success"
       });
     } catch (err: any) {
@@ -817,10 +844,17 @@ export default function DeveloperConsole({
                             <td className="px-3 py-3 text-[10px] text-stone-500">
                               {new Date(c.registeredAt).toLocaleString(currentLang === "ar" ? "ar-EG" : "en-US")}
                             </td>
-                            <td className="px-3 py-3 text-center">
+                            <td className="px-3 py-3 flex gap-2 justify-center">
+                              <button
+                                onClick={() => handleWarnCustomer(c.email)}
+                                className="px-2.5 py-1.5 bg-yellow-950/40 hover:bg-yellow-900/60 text-yellow-500 hover:text-yellow-400 rounded-xl text-[10px] font-bold transition-all border border-yellow-900/40 flex items-center gap-1 cursor-pointer"
+                                title={currentLang === "ar" ? "إرسال تحذير" : "Send warning"}
+                              >
+                                <span>{currentLang === "ar" ? "تحذير ⚠️" : "Warn ⚠️"}</span>
+                              </button>
                               <button
                                 onClick={() => handleBlockCustomer(c.email)}
-                                className="px-2.5 py-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 rounded-xl text-[10px] font-bold transition-all border border-red-900/40 flex items-center gap-1 mx-auto cursor-pointer"
+                                className="px-2.5 py-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 rounded-xl text-[10px] font-bold transition-all border border-red-900/40 flex items-center gap-1 cursor-pointer"
                                 title={currentLang === "ar" ? "حظر وحظر البصمة/الاسم/الهاتف" : "Ban user permanently"}
                               >
                                 <ShieldAlert className="w-3.5 h-3.5" />

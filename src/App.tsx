@@ -2424,10 +2424,17 @@ ${itemsList}
                                   setLoginName('');
                                   setLoginPhone('');
                                   handleLoginSuccess(data.user);
-                                  alert(currentLang === 'ar'
-                                    ? `🎉 تم التحقق بنجاح ومطابقة ملامح صورتك المعتمدة! أهلاً بك مجدداً: ${data.user.name}`
-                                    : `🎉 Verified successfully! Welcome back, ${data.user.name}`
-                                  );
+                                  
+                                  if (data.user.details?.warningMessage) {
+                                    alert(currentLang === 'ar' 
+                                      ? `⚠️ رسالة إدارية هامة / تحذير:\n${data.user.details.warningMessage}` 
+                                      : `⚠️ Administrative Warning:\n${data.user.details.warningMessage}`);
+                                  } else {
+                                    alert(currentLang === 'ar'
+                                      ? `🎉 تم التحقق بنجاح ومطابقة بيانات حسابك! أهلاً بك مجدداً: ${data.user.name}`
+                                      : `🎉 Verified successfully! Welcome back, ${data.user.name}`
+                                    );
+                                  }
                                 } else {
                                   setRegError(data.error || 'Matching failed');
                                 }
