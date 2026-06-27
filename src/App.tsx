@@ -2354,10 +2354,10 @@ ${itemsList}
                                   <div className="space-y-1 py-2">
                                     <span className="text-2xl block">📸</span>
                                     <span className="block text-xs font-bold text-slate-600">{currentLang === 'ar' ? 'اختر صورة شخصية حقيقية لك' : 'Select a real photo of yourself'}</span>
-                                    <span className="block text-[10px] text-slate-400 leading-relaxed max-w-xs mx-auto">
+                                    <span className="block text-[10px] text-rose-500 font-bold leading-relaxed max-w-xs mx-auto">
                                       {currentLang === 'ar' 
-                                        ? 'يجب أن تكون صورتك الشخصية بملامح واضحة وظاهرة ليقبلها نظام التحقق من الوجه بالذكاء الاصطناعي Gemini.' 
-                                        : 'Your face features must be clearly visible. Selfies or portraits are verified live via Gemini AI.'}
+                                        ? 'تنبيه: يجب أن تكون الصورة حقيقية لك وبملامح واضحة. الإدارة تقوم بمراجعة جميع الحسابات دورياً وسوف يتم حظر أي حساب يستخدم صورة وهمية أو غير حقيقية فوراً.' 
+                                        : 'Warning: Real profile picture required. Management manually reviews accounts and fake photos will result in an immediate permanent ban.'}
                                     </span>
                                   </div>
                                 )}
@@ -2570,8 +2570,8 @@ ${itemsList}
                     </h4>
                     <p className="text-xs text-slate-600 leading-relaxed">
                       {currentLang === 'ar' 
-                        ? 'عذراً! طلبك الحالي معلق ومحفوظ في السلة مؤقتاً. لحمايتنا ولضمان جدية الطلبات في مطعم French Touch، يُشترط تسجيل حساب زبون حقيقي ورفع صورتك لتأكيدها بالذكاء الاصطناعي Gemini قبل إرسال الطلب للواتساب.' 
-                        : 'Sorry! Your current order is pending and saved. To guarantee authenticity, you must register a classic customer profile and upload your photo for live Gemini AI verification before WhatsApp forwarding.'}
+                        ? 'عذراً! طلبك الحالي معلق ومحفوظ في السلة مؤقتاً. لحمايتنا ولضمان جدية الطلبات في مطعم French Touch، يُشترط تسجيل حساب زبون حقيقي ورفع صورتك لتأكيدها قبل إرسال الطلب للواتساب.' 
+                        : 'Sorry! Your current order is pending and saved. To guarantee authenticity, you must register a classic customer profile and upload your photo for verification before WhatsApp forwarding.'}
                     </p>
                   </div>
 

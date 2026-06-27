@@ -590,98 +590,6 @@ app.post("/api/auth/manager-login", async (req, res) => {
   });
 });
 
-// 4.5.5 Customer Registration with Gemini Face Validation and Culinary Mood Analysis
-async function validateProfilePictureWithGemini(base64DataUrl: string): Promise<{ isHumanFace: boolean; reason?: string; aiAnalysis?: { culinaryMood: string; personalityAnalysis: string; recommendedDish: string } }> {
-  try {
-    const ai = getGeminiClient();
-    if (!base64DataUrl) {
-      return { isHumanFace: false, reason: "لم يتم توفير صورة الحساب" };
-    }
-
-    // Extract mime type and clean base64 data
-    const matches = base64DataUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
-    if (!matches || matches.length < 3) {
-      return { isHumanFace: false, reason: "صيغة الصورة غير صالحة" };
-    }
-
-    const mimeType = matches[1];
-    const base64Data = matches[2];
-
-    const imagePart = {
-      inlineData: {
-        mimeType,
-        data: base64Data,
-      },
-    };
-
-    const promptText = `Evaluate the uploaded profile picture.
-Determine if it is a photo of a real human being with clear and visible facial features.
-Criteria:
-- It must be a real photo of a human face (not a cartoon, not an avatar, not an object, not an animal).
-- The face and features must be clearly visible and recognizable (not heavily blurred, not extremely dark, not completely obscured, and not heavily filtered).
-
-Also, if it is a valid human face, perform a creative, warm, and highly delightful "Culinary Personality & Mood Analysis" (تحليل شخصية التذوق الباريسية) based on their facial features, smile, or expression. Match their facial vibe to one of our French Touch gourmet categories:
-- "Classic Gourmet Connoisseur" (عشاق الكلاسيكيات الراقية)
-- "Golden Crispy Adventurer" (مستكشف القرمشة الذهبية)
-- "Elegant Sweet Romantic" (ذواقة اللمسات الحلوة الراقية)
-- "Vibrant Energy Sensation" (عشاق الانتعاش والحيوية)
-
-Provide a highly customized and delightful 2-3 sentence paragraph in Arabic (personalityAnalysis) explaining how their facial features reflect their taste profile and giving them a warm gourmet welcome.
-Also recommend a dish from this list (recommendedDish) that fits their vibe:
-- "Classic French Touch Smash" (سماش برجر فرنش تاتش كلاسيك)
-- "Truffle Mushroom Smash" (سماش برجر المشروم والترفل الفاخر)
-- "Le Parisien Crispy Chicken Sandwich" (ساندوتش دجاج باريسيان المقرمش)
-- "French Touch Fries" (بطاطس فرنش تاتش بالجبنة والأعشاب)
-- "Artisanal Parisian Macarons" (ماكارون باريسي فاخر)
-
-You must respond STRICTLY with a JSON object in this format:
-{
-  "isHumanFace": boolean,
-  "reason": "Explain in Arabic the reason if false, or leave empty if true",
-  "aiAnalysis": {
-    "culinaryMood": "Gourmet style name in Arabic (e.g. عشاق الكلاسيكيات الراقية)",
-    "personalityAnalysis": "2-3 sentences in Arabic with warm, personalized culinary vibes based on their smile/features",
-    "recommendedDish": "Name of the recommended dish from the list in Arabic"
-  }
-}
-
-Arabic examples of reasons:
-- "الصورة المرفوعة ليست لشخص حقيقي (رسومات أو مجسم أو كارتون). يرجى رفع صورة حقيقية واضحة."
-- "ملامح الوجه غير واضحة أو مظلمة جداً أو مغطاة. يرجى رفع صورة بملامح ظاهرة."
-`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: { parts: [imagePart, { text: promptText }] },
-      config: {
-        responseMimeType: "application/json",
-      }
-    });
-
-    const text = response.text || "{}";
-    const result = JSON.parse(text);
-    return {
-      isHumanFace: !!result.isHumanFace,
-      reason: result.reason || "الصورة غير مطابقة للمواصفات المطلوبة لوجه بشري بملامح ظاهره.",
-      aiAnalysis: result.aiAnalysis || undefined
-    };
-  } catch (error: any) {
-    console.error("Gemini face validation failed:", error);
-    if (!process.env.GEMINI_API_KEY) {
-      console.warn("GEMINI_API_KEY is missing. Profile picture auto-approved (simulated check).");
-      return { 
-        isHumanFace: true,
-        aiAnalysis: {
-          culinaryMood: "عشاق الكلاسيكيات الراقية",
-          personalityAnalysis: "نظراتك الثاقبة وملامحك الواثقة تدل على ذوق فرنسي رفيع يبحث عن النكهات المتوازنة والتفاصيل الفاخرة المتقنة.",
-          recommendedDish: "سماش برجر المشروم والترفل الفاخر"
-        }
-      };
-    }
-    return { isHumanFace: false, reason: "فشل التحقق الذكي من الصورة حالياً: " + error.message };
-  }
-}
-
 function normalizeArabic(text: string): string {
   return text
     .trim()
@@ -707,92 +615,6 @@ function isEgyptianPhone(phone: string): boolean {
     cleaned = "0" + cleaned;
   }
   return /^01[0125]\d{8}$/.test(cleaned);
-}
-
-async function checkSimilarityWithBlockedGemini(
-  newCust: { firstName: string; secondName: string; thirdName: string; phone: string; alternativePhone: string; email: string; picture: string },
-  blockedCusts: any[]
-): Promise<{ isBlocked: boolean; reason?: string }> {
-  try {
-    const ai = getGeminiClient();
-    if (!process.env.GEMINI_API_KEY) return { isBlocked: false };
-
-    // Format blocked list for text analysis
-    const blockedListText = blockedCusts.map((b, idx) => {
-      return `Blocked User #${idx + 1}:
-- Name: ${b.firstName} ${b.secondName} ${b.thirdName}
-- Email: ${b.email}
-- Phones: ${b.phone}, ${b.alternativePhone}`;
-    }).join("\n\n");
-
-    const promptText = `We are a high-end restaurant with a strict security policy. We have a list of banned/blocked customers who tried to cheat, bypass limits, or misbehave.
-We need to check if this new registration belongs to a blocked person using "similar information", "similar numbers", "similar name", or "similar face profile".
-
-NEW REGISTRATION DETAILS:
-- Name: ${newCust.firstName} ${newCust.secondName} ${newCust.thirdName}
-- Email: ${newCust.email}
-- Phones: ${newCust.phone}, ${newCust.alternativePhone}
-
-LIST OF BANNED CUSTOMERS:
-${blockedListText}
-
-TASK:
-1. Analyze if the new registration details (Name, Email, Phone Numbers) are identical, slightly altered, or highly similar to any of the banned customers above. (For example, slight spelling differences, swapping names, adding/removing country codes in phones, dots in gmail, or slightly different email names).
-2. Look at the uploaded photo of the new registrant. Determine if they are the exact same person visually as any previously blocked customer. Note: You should check if the face structure, nose, eyes, or overall facial features are highly similar to any known blocked accounts (if you can determine).
-
-Respond strictly in JSON format:
-{
-  "isBlocked": boolean,
-  "reason": "Explain in clear Arabic why they are blocked (e.g. 'تم رفض التسجيل لمطابقة البيانات مع حساب محظور نهائياً بسبب تماثل الهاتف/الاسم/الملامح')"
-}`;
-
-    const parts: any[] = [];
-    
-    // Add new customer image
-    const matches = newCust.picture.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
-    if (matches && matches.length >= 3) {
-      parts.push({
-        inlineData: {
-          mimeType: matches[1],
-          data: matches[2]
-        }
-      });
-    }
-
-    // Add up to 2 blocked customer images to compare visually
-    const recentBlockedWithPics = blockedCusts.filter(b => b.picture).slice(0, 2);
-    recentBlockedWithPics.forEach((b, idx) => {
-      const bMatches = b.picture.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
-      if (bMatches && bMatches.length >= 3) {
-        parts.push({
-          inlineData: {
-            mimeType: bMatches[1],
-            data: bMatches[2]
-          }
-        });
-        parts.push({ text: `This is the image of Banned User #${idx + 1}` });
-      }
-    });
-
-    parts.push({ text: promptText });
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: { parts },
-      config: {
-        responseMimeType: "application/json",
-      }
-    });
-
-    const result = JSON.parse(response.text || "{}");
-    return {
-      isBlocked: !!result.isBlocked,
-      reason: result.reason
-    };
-  } catch (err) {
-    console.error("Gemini similarity check failed:", err);
-    return { isBlocked: false };
-  }
 }
 
 app.post("/api/auth/register-customer", async (req, res) => {
@@ -847,17 +669,6 @@ app.post("/api/auth/register-customer", async (req, res) => {
     }
   }
 
-  // 2. Check intelligent Gemini-based similarity block check
-  if (blocked.length > 0) {
-    const geminiBlockCheck = await checkSimilarityWithBlockedGemini(
-      { firstName, secondName, thirdName, phone, alternativePhone, email, picture },
-      blocked
-    );
-    if (geminiBlockCheck.isBlocked) {
-      return res.status(400).json({ error: geminiBlockCheck.reason || "تم رفض التسجيل لوجود مطابقة مع حساب محظور." });
-    }
-  }
-
   // Check if already registered
   const exists = (db.registeredCustomers || []).some(c => c.email.toLowerCase() === cleanEmail);
   if (exists) {
@@ -865,7 +676,7 @@ app.post("/api/auth/register-customer", async (req, res) => {
   }
 
   // Add customer directly to DB
-  const newCustomer: RegisteredCustomer & { aiAnalysis?: any } = {
+  const newCustomer: RegisteredCustomer = {
     firstName: firstName.trim(),
     secondName: secondName.trim(),
     thirdName: thirdName.trim(),
@@ -873,12 +684,7 @@ app.post("/api/auth/register-customer", async (req, res) => {
     alternativePhone: alternativePhone.trim(),
     email: cleanEmail,
     picture: picture,
-    registeredAt: new Date().toISOString(),
-    aiAnalysis: {
-      culinaryMood: "عشاق الكلاسيكيات الراقية",
-      personalityAnalysis: "نظراتك الثاقبة وملامحك الواثقة تدل على ذوق فرنسي رفيع يبحث عن النكهات المتوازنة والتفاصيل الفاخرة المتقنة.",
-      recommendedDish: "سماش برجر المشروم والترفل الفاخر"
-    }
+    registeredAt: new Date().toISOString()
   };
 
   if (!db.registeredCustomers) db.registeredCustomers = [];

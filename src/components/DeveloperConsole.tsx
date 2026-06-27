@@ -171,24 +171,38 @@ export default function DeveloperConsole({
   };
 
   const handleWarnCustomer = async (email: string) => {
-    const warningMessage = window.prompt(currentLang === "ar" ? "أدخل نص التحذير ليتم عرضه للعميل عند تسجيل الدخول:" : "Enter warning message to show to the customer on login:");
-    if (!warningMessage) return;
+    const warningMessage = window.prompt(currentLang === "ar" ? "أدخل نص التحذير ليتم عرضه للعميل عند تسجيل الدخول (اتركه فارغاً لإزالة التحذير):" : "Enter warning message to show to the customer on login (leave empty to remove warning):");
+    
     setMessage(null);
     try {
-      const res = await fetch("/api/warn-customer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-email": currentUser.email,
-          "x-user-role": currentUser.role
-        },
-        body: JSON.stringify({ email, warningMessage })
-      });
+      let res;
+      if (!warningMessage) {
+        res = await fetch("/api/unwarn-customer", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": currentUser.email,
+            "x-user-role": currentUser.role
+          },
+          body: JSON.stringify({ email })
+        });
+      } else {
+        res = await fetch("/api/warn-customer", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-email": currentUser.email,
+            "x-user-role": currentUser.role
+          },
+          body: JSON.stringify({ email, warningMessage })
+        });
+      }
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to warn customer");
       setCustomers(data.registeredCustomers || []);
       setMessage({
-        text: currentLang === "ar" ? "تم إرسال التحذير بنجاح!" : "Warning sent successfully!",
+        text: currentLang === "ar" ? "تم تحديث حالة التحذير بنجاح!" : "Warning status updated successfully!",
         type: "success"
       });
     } catch (err: any) {
@@ -824,12 +838,16 @@ export default function DeveloperConsole({
                                 className="w-10 h-10 rounded-full border border-amber-400 object-cover mx-auto shadow"
                                 referrerPolicy="no-referrer"
                               />
-                              <span className="block text-[8px] text-emerald-400 mt-1">✓ ملامح معتمدة</span>
                             </td>
                             <td className="px-3 py-3 font-bold text-stone-200">
                               <div className="flex flex-col">
                                 <span>{c.firstName} {c.secondName} {c.thirdName}</span>
                                 <span className="text-[9px] text-stone-500 uppercase font-mono mt-0.5">Classic Account</span>
+                                {c.warningMessage && (
+                                  <span className="text-[9px] text-yellow-500 mt-1 max-w-[120px] truncate" title={c.warningMessage}>
+                                    ⚠️ {c.warningMessage}
+                                  </span>
+                                )}
                               </div>
                             </td>
                             <td className="px-3 py-3 font-mono text-stone-300 select-all">
