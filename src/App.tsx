@@ -215,6 +215,16 @@ export default function App() {
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState('');
   const [regSuccess, setRegSuccess] = useState(false);
+  
+  // 2FA Verification Flow
+  const [verificationFlow, setVerificationFlow] = useState<{
+    active: boolean;
+    step: 'email' | 'phone';
+    sessionId: string;
+    email: string;
+    phone: string;
+    otpInput: string;
+  }>({ active: false, step: 'email', sessionId: '', email: '', phone: '', otpInput: '' });
 
   // Existing Customer Login / Account Retrieval State
   const [authFormTab, setAuthFormTab] = useState<'register' | 'login'>('register');
@@ -2038,8 +2048,86 @@ ${itemsList}
                     </div>
                   ) : (
                     <div className="space-y-6">
-                      {/* Form Tabs */}
-                      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/40">
+                      {verificationFlow.active ? (
+                        <div className="space-y-6 text-center animate-in fade-in zoom-in-95 duration-300">
+                          <div className="mx-auto w-16 h-16 bg-blue-50 text-brand-blue rounded-full flex items-center justify-center text-2xl">
+                            ✉️
+                          </div>
+                          <h3 className="serif-heading text-xl font-extrabold text-brand-blue">
+                            {currentLang === 'ar' ? 'توثيق الحساب' : 'Account Verification'}
+                          </h3>
+                          <p className="text-sm text-slate-500 leading-relaxed">
+                            {currentLang === 'ar' 
+                                ? `الرجاء إدخال رمز التحقق المكون من 6 أرقام المرسل إلى بريدك الإلكتروني: ${verificationFlow.email}` 
+                                : `Please enter the 6-digit verification code sent to your email: ${verificationFlow.email}`
+                            }
+                          </p>
+                          <div className="space-y-4">
+                            <input
+                              type="text"
+                              value={verificationFlow.otpInput}
+                              onChange={(e) => setVerificationFlow({ ...verificationFlow, otpInput: e.target.value })}
+                              placeholder={currentLang === 'ar' ? 'ادخل الرمز هنا...' : 'Enter code here...'}
+                              className="w-full bg-slate-50 border border-slate-200 text-brand-blue text-center text-2xl font-mono tracking-[0.5em] rounded-xl px-4 py-4 outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold transition-all"
+                              maxLength={6}
+                            />
+                            {regError && <p className="text-red-500 text-xs font-bold bg-red-50 p-2 rounded">{regError}</p>}
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setRegLoading(true);
+                                setRegError('');
+                                try {
+                                  const res = await fetch('/api/auth/verify-email-otp', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ sessionId: verificationFlow.sessionId, otp: verificationFlow.otpInput })
+                                  });
+                                  const data = await res.json();
+                                  if (res.ok && data.success) {
+                                      setVerificationFlow({ ...verificationFlow, active: false });
+                                      setRegFirstName('');
+                                      setRegSecondName('');
+                                      setRegThirdName('');
+                                      setRegEmail('');
+                                      setRegPhone('');
+                                      setRegAltPhone('');
+                                      setRegPicture('');
+                                      handleLoginSuccess(data.user);
+                                      alert(currentLang === 'ar' 
+                                        ? `🎉 تم تسجيل وتوثيق حسابك بنجاح!` 
+                                        : `🎉 Registration & Verification successful!`);
+                                  } else {
+                                    setRegError(data.error || 'Verification failed');
+                                  }
+                                } catch (err) {
+                                  setRegError('Server error');
+                                } finally {
+                                  setRegLoading(false);
+                                }
+                              }}
+                              className="w-full bg-brand-blue text-brand-cream py-4 rounded-xl font-bold hover:bg-brand-gold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+                              disabled={regLoading}
+                            >
+                              {currentLang === 'ar' ? 'تحقق واستمرار' : 'Verify & Continue'}
+                            </button>
+                            
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                setVerificationFlow({ ...verificationFlow, active: false });
+                                setRegError('');
+                              }}
+                              className="text-xs text-slate-400 hover:text-brand-blue cursor-pointer"
+                            >
+                              {currentLang === 'ar' ? 'إلغاء والعودة' : 'Cancel & Return'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Form Tabs */}
+                          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/40">
                         <button
                           type="button"
                           onClick={() => {
@@ -2144,23 +2232,26 @@ ${itemsList}
 
                                 const data = await response.json();
                                 if (response.ok && data.success) {
-                                  // Reset registration form values
-                                  setRegFirstName('');
-                                  setRegSecondName('');
-                                  setRegThirdName('');
-                                  setRegEmail('');
-                                  setRegPhone('');
-                                  setRegAltPhone('');
-                                  setRegPicture('');
-                                  
-                                  // Trigger login
-                                  handleLoginSuccess(data.user);
-                                  
-                                  // Show friendly success confirmation alert
-                                  alert(currentLang === 'ar' 
-                                    ? `🎉 تم تسجيل حسابك بنجاح ومطابقة ملامح صورتك بالذكاء الاصطناعي Gemini!\n📬 تم إرسال نشرة العروض والمنتجات الجديدة تلقائياً إلى بريدك الإلكتروني: ${data.user.email}` 
-                                    : `🎉 Registration successful! Face matched successfully via Gemini AI.\n📬 New offers & dishes sent to your Gmail: ${data.user.email}`
-                                  );
+                                  if (data.requiresVerification) {
+                                    setVerificationFlow({
+                                      active: true,
+                                      step: 'email',
+                                      sessionId: data.sessionId,
+                                      email: regEmail,
+                                      phone: regPhone,
+                                      otpInput: ''
+                                    });
+                                  } else {
+                                    // Fallback for direct login (if no verification required)
+                                    setRegFirstName('');
+                                    setRegSecondName('');
+                                    setRegThirdName('');
+                                    setRegEmail('');
+                                    setRegPhone('');
+                                    setRegAltPhone('');
+                                    setRegPicture('');
+                                    handleLoginSuccess(data.user);
+                                  }
                                 } else {
                                   setRegError(data.error || 'Registration failed');
                                 }
@@ -2498,8 +2589,10 @@ ${itemsList}
                           </form>
                         </>
                       )}
-                    </div>
-                  )}
+                      </>
+                    )}
+                  </div>
+                )}
                 </div>
               </div>
             )}

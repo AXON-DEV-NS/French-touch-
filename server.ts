@@ -4,9 +4,17 @@ import fs from "fs";
 import { kv } from "@vercel/kv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
+import { sendEmailOtp, sendPhoneOtp } from "./server/sendOtpService";
 
 const app = express();
 const PORT = 3000;
+
+// OTP memory storage
+const pendingVerifications = new Map<string, {
+  customerPayload: any;
+  emailOtp: string;
+  expiresAt: number;
+}>();
 
 // Lazy initialization of GoogleGenAI to prevent startup crashes when GEMINI_API_KEY is missing
 let aiInstance: GoogleGenAI | null = null;
@@ -860,7 +868,7 @@ app.post("/api/auth/register-customer", async (req, res) => {
     return res.status(400).json({ error: faceCheck.reason });
   }
 
-  // Add customer
+  // Add customer payload to pending verifications instead of DB directly
   const newCustomer: RegisteredCustomer & { aiAnalysis?: any } = {
     firstName: firstName.trim(),
     secondName: secondName.trim(),
@@ -877,21 +885,53 @@ app.post("/api/auth/register-customer", async (req, res) => {
     }
   };
 
+  const emailOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  const sessionId = Buffer.from(cleanEmail).toString('base64');
+  
+  pendingVerifications.set(sessionId, {
+    customerPayload: newCustomer,
+    emailOtp,
+    expiresAt: Date.now() + 15 * 60 * 1000 // 15 mins
+  });
+
+  // Send Email OTP
+  await sendEmailOtp(cleanEmail, emailOtp);
+
+  res.json({ success: true, requiresVerification: true, sessionId, message: "تم إرسال رمز التحقق إلى بريدك الإلكتروني" });
+});
+
+// Endpoint to Verify Email OTP
+app.post("/api/auth/verify-email-otp", async (req, res) => {
+  const { sessionId, otp } = req.body;
+  const session = pendingVerifications.get(sessionId);
+  
+  if (!session || session.expiresAt < Date.now()) {
+    return res.status(400).json({ error: "انتهت صلاحية الجلسة، الرجاء التسجيل من جديد." });
+  }
+
+  if (session.emailOtp !== otp) {
+    return res.status(400).json({ error: "الرمز غير صحيح." });
+  }
+
+  pendingVerifications.delete(sessionId);
+
+  const newCustomer = session.customerPayload;
+  const cleanEmail = newCustomer.email;
+  const db = await readDb();
+
   if (!db.registeredCustomers) db.registeredCustomers = [];
   db.registeredCustomers.unshift(newCustomer);
 
-  // Automatically make them a subscriber too
   if (!db.subscribers) db.subscribers = [];
   if (!db.subscribers.includes(cleanEmail)) {
     db.subscribers.push(cleanEmail);
   }
 
-  // Log as visitor
   const fullName = `${newCustomer.firstName} ${newCustomer.secondName} ${newCustomer.thirdName}`;
   const newVisitor: Visitor = {
     email: cleanEmail,
     name: fullName,
-    picture: picture,
+    picture: newCustomer.picture,
     timestamp: new Date().toISOString(),
     ip: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1",
     userAgent: req.headers["user-agent"] || "Customer Registration Flow",
@@ -900,7 +940,6 @@ app.post("/api/auth/register-customer", async (req, res) => {
   };
   db.visitors.unshift(newVisitor);
 
-  // Auto-send welcome email log with latest offers/products
   const emailLog: EmailLogObj = {
     toEmail: cleanEmail,
     subject: "🎁 أهلاً بك في فرنش تاتش! عروضنا الحصرية والمنتجات الجديدة بانتظارك",
@@ -931,12 +970,13 @@ app.post("/api/auth/register-customer", async (req, res) => {
       email: cleanEmail,
       name: `${newCustomer.firstName} ${newCustomer.secondName}`,
       role: "Customer",
-      picture: picture,
+      picture: newCustomer.picture,
       lang: "ar",
       details: newCustomer
     }
   });
 });
+
 
 // Endpoint for matching and fetching data of existing registered customers
 app.post("/api/auth/login-existing-customer", async (req, res) => {
