@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import { kv } from "@vercel/kv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -152,96 +153,63 @@ const DEFAULT_CATEGORIES = [
 ];
 
 // Read database helper
-function readDb(): DbSchema {
+async function readDb(): Promise<DbSchema> {
+  const initialDb: DbSchema = {
+    managers: [],
+    visitors: [],
+    pageViews: 0,
+    categories: DEFAULT_CATEGORIES,
+    subscribers: [],
+    registeredCustomers: [],
+    emailLogs: [],
+    blockedCustomers: [],
+    orderCounter: 0,
+    reviews: []
+  };
   try {
+    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+      const data = await kv.get<DbSchema>("frenchtouch_db");
+      if (data) {
+        // ensure missing properties
+        if (data.orderCounter === undefined) data.orderCounter = 0;
+        if (data.pageViews === undefined) data.pageViews = 0;
+        if (data.blockedCustomers === undefined) data.blockedCustomers = [];
+        if (data.reviews === undefined) data.reviews = [];
+        return data;
+      }
+      return initialDb;
+    }
+
     if (!fs.existsSync(DB_FILE)) {
-      const initialDb: DbSchema = {
-        managers: [], // Developer will add managers dynamically
-        visitors: [],
-        pageViews: 0,
-        categories: DEFAULT_CATEGORIES,
-        subscribers: [],
-        registeredCustomers: [],
-        emailLogs: [],
-        blockedCustomers: [],
-        orderCounter: 0
-      };
       fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2));
       return initialDb;
     }
     const content = fs.readFileSync(DB_FILE, "utf-8");
     const parsed = JSON.parse(content);
-    let changed = false;
-
-    if (parsed.orderCounter === undefined) {
-      parsed.orderCounter = 0;
-      changed = true;
-    }
-
-    if (parsed.pageViews === undefined) {
-      parsed.pageViews = 0;
-      changed = true;
-    }
-    if (!parsed.categories || parsed.categories.length === 0) {
-      parsed.categories = DEFAULT_CATEGORIES;
-      changed = true;
-    }
-    if (!parsed.subscribers) {
-      parsed.subscribers = [];
-      changed = true;
-    }
-    if (!parsed.registeredCustomers) {
-      parsed.registeredCustomers = [];
-      changed = true;
-    }
-    if (!parsed.emailLogs) {
-      parsed.emailLogs = [];
-      changed = true;
-    }
-    if (!parsed.blockedCustomers) {
-      parsed.blockedCustomers = [];
-      changed = true;
-    }
-    if (!parsed.reviews) {
-      parsed.reviews = [];
-      changed = true;
-    }
-    if (parsed.managers) {
-      parsed.managers = parsed.managers.map((m: any) => {
-        if (typeof m === "string") {
-          return {
-            email: m.toLowerCase(),
-            name: m.split("@")[0],
-            addedAt: new Date().toISOString(),
-            password: "123" // default fallback password
-          };
-        }
-        return m;
-      });
-    } else {
-      parsed.managers = [];
-      changed = true;
-    }
-
-    if (changed) {
-      fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), "utf-8");
-    }
+    
+    if (parsed.orderCounter === undefined) parsed.orderCounter = 0;
+    if (parsed.pageViews === undefined) parsed.pageViews = 0;
+    if (parsed.blockedCustomers === undefined) parsed.blockedCustomers = [];
+    if (parsed.reviews === undefined) parsed.reviews = [];
+    
     return parsed;
   } catch (error) {
     console.error("Error reading database:", error);
-    return { managers: [], visitors: [], pageViews: 0, categories: DEFAULT_CATEGORIES, subscribers: [], registeredCustomers: [], emailLogs: [], reviews: [] };
+    return initialDb;
   }
 }
 
-// Write database helper
-function writeDb(data: DbSchema) {
+async function writeDb(data: DbSchema) {
   try {
+    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+      await kv.set("frenchtouch_db", data);
+      return;
+    }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (error) {
     console.error("Error writing database:", error);
   }
 }
-
 // ----------------------------------------------------
 // API ROUTES
 // ----------------------------------------------------
@@ -281,7 +249,7 @@ app.use((req, res, next) => {
 });
 
 // 1. Google OAuth URL Request
-app.get("/api/auth/google/url", (req, res) => {
+app.get("/api/auth/google/url", async (req, res) => {
   const redirectUri = req.query.redirect_uri as string;
   const clientId = process.env.GOOGLE_CLIENT_ID;
 
@@ -357,7 +325,7 @@ app.get(["/auth/google/callback", "/auth/google/callback/"], async (req, res) =>
     if (email === "oren.on.oren.25@gmail.com") {
       role = "Developer";
     } else {
-      const db = readDb();
+      const db = await readDb();
       const manager = db.managers.find(m => m.email.toLowerCase() === email);
       if (manager) {
         role = "Manager";
@@ -366,7 +334,7 @@ app.get(["/auth/google/callback", "/auth/google/callback/"], async (req, res) =>
     }
 
     // Log the visitor
-    const db = readDb();
+    const db = await readDb();
     const newVisitor: Visitor = {
       email,
       name,
@@ -378,7 +346,7 @@ app.get(["/auth/google/callback", "/auth/google/callback/"], async (req, res) =>
       role
     };
     db.visitors.unshift(newVisitor);
-    writeDb(db);
+    await writeDb(db);
 
     // Send successful popup payload to close popup and postMessage back to parent window
     res.send(`
@@ -419,7 +387,7 @@ app.get(["/auth/google/callback", "/auth/google/callback/"], async (req, res) =>
 });
 
 // 3. Sandbox Login Route (For local development & instant testing)
-app.post("/api/auth/sandbox", (req, res) => {
+app.post("/api/auth/sandbox", async (req, res) => {
   const { email, name } = req.body;
 
   if (!email) {
@@ -435,7 +403,7 @@ app.post("/api/auth/sandbox", (req, res) => {
   if (cleanEmail === "oren.on.oren.25@gmail.com") {
     role = "Developer";
   } else {
-    const db = readDb();
+    const db = await readDb();
     const manager = db.managers.find(m => m.email.toLowerCase() === cleanEmail);
     if (manager) {
       role = "Manager";
@@ -444,7 +412,7 @@ app.post("/api/auth/sandbox", (req, res) => {
   }
 
   // Log visitor
-  const db = readDb();
+  const db = await readDb();
   const newVisitor: Visitor = {
     email: cleanEmail,
     name: cleanName,
@@ -456,7 +424,7 @@ app.post("/api/auth/sandbox", (req, res) => {
     role
   };
   db.visitors.unshift(newVisitor);
-  writeDb(db);
+  await writeDb(db);
 
   const registeredCustomer = db.registeredCustomers?.find(c => c.email.toLowerCase() === cleanEmail);
 
@@ -471,7 +439,7 @@ app.post("/api/auth/sandbox", (req, res) => {
 });
 
 // 3.5 Firebase Auth Login Route
-app.post("/api/auth/firebase-login", (req, res) => {
+app.post("/api/auth/firebase-login", async (req, res) => {
   const { email, name, picture } = req.body;
 
   if (!email) {
@@ -487,7 +455,7 @@ app.post("/api/auth/firebase-login", (req, res) => {
   if (cleanEmail === "oren.on.oren.25@gmail.com") {
     role = "Developer";
   } else {
-    const db = readDb();
+    const db = await readDb();
     const manager = db.managers.find(m => m.email.toLowerCase() === cleanEmail);
     if (manager) {
       role = "Manager";
@@ -496,7 +464,7 @@ app.post("/api/auth/firebase-login", (req, res) => {
   }
 
   // Log visitor
-  const db = readDb();
+  const db = await readDb();
   const newVisitor: Visitor = {
     email: cleanEmail,
     name: cleanName,
@@ -508,7 +476,7 @@ app.post("/api/auth/firebase-login", (req, res) => {
     role
   };
   db.visitors.unshift(newVisitor);
-  writeDb(db);
+  await writeDb(db);
 
   const registeredCustomer = db.registeredCustomers?.find(c => c.email.toLowerCase() === cleanEmail);
 
@@ -523,12 +491,12 @@ app.post("/api/auth/firebase-login", (req, res) => {
 });
 
 // 4. Managers Endpoints
-app.get("/api/managers", requireDeveloper, (req, res) => {
-  const db = readDb();
+app.get("/api/managers", requireDeveloper, async (req, res) => {
+  const db = await readDb();
   res.json(db.managers);
 });
 
-app.post("/api/managers", requireDeveloper, (req, res) => {
+app.post("/api/managers", requireDeveloper, async (req, res) => {
   const { email, name, password, lang } = req.body;
   if (!email) {
     return res.status(400).json({ error: "Email is required" });
@@ -538,7 +506,7 @@ app.post("/api/managers", requireDeveloper, (req, res) => {
   const cleanName = name?.trim() || cleanEmail.split("@")[0];
   const cleanPassword = password?.trim() || "123";
   const cleanLang = lang || "ar";
-  const db = readDb();
+  const db = await readDb();
 
   if (db.managers.some(m => m.email.toLowerCase() === cleanEmail)) {
     return res.status(400).json({ error: "Email is already authorized as a manager" });
@@ -553,21 +521,21 @@ app.post("/api/managers", requireDeveloper, (req, res) => {
   };
 
   db.managers.push(newManager);
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, managers: db.managers });
 });
 
-app.delete("/api/managers/:email", requireDeveloper, (req, res) => {
+app.delete("/api/managers/:email", requireDeveloper, async (req, res) => {
   const emailToRemove = req.params.email.trim().toLowerCase();
-  const db = readDb();
+  const db = await readDb();
 
   db.managers = db.managers.filter(m => m.email.toLowerCase() !== emailToRemove);
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, managers: db.managers });
 });
 
 // 4.5 Manager Password Login Gate
-app.post("/api/auth/manager-login", (req, res) => {
+app.post("/api/auth/manager-login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
@@ -575,7 +543,7 @@ app.post("/api/auth/manager-login", (req, res) => {
 
   const cleanEmail = email.trim().toLowerCase();
   const cleanPassword = password.trim();
-  const db = readDb();
+  const db = await readDb();
 
   const manager = db.managers.find(m => m.email.toLowerCase() === cleanEmail);
   if (!manager) {
@@ -598,7 +566,7 @@ app.post("/api/auth/manager-login", (req, res) => {
     role: "Manager"
   };
   db.visitors.unshift(newVisitor);
-  writeDb(db);
+  await writeDb(db);
 
   res.json({
     success: true,
@@ -841,7 +809,7 @@ app.post("/api/auth/register-customer", async (req, res) => {
   }
 
   const cleanEmail = email.trim().toLowerCase();
-  const db = readDb();
+  const db = await readDb();
 
   // 1. Check strict programmatic blocking first
   const blocked = db.blockedCustomers || [];
@@ -955,7 +923,7 @@ app.post("/api/auth/register-customer", async (req, res) => {
   if (!db.emailLogs) db.emailLogs = [];
   db.emailLogs.unshift(emailLog);
 
-  writeDb(db);
+  await writeDb(db);
 
   res.json({
     success: true,
@@ -971,7 +939,7 @@ app.post("/api/auth/register-customer", async (req, res) => {
 });
 
 // Endpoint for matching and fetching data of existing registered customers
-app.post("/api/auth/login-existing-customer", (req, res) => {
+app.post("/api/auth/login-existing-customer", async (req, res) => {
   const { email, name, phone } = req.body;
   if (!email || !name || !phone) {
     return res.status(400).json({ error: "جميع الحقول مطلوبة للمطابقة: البريد الإلكتروني والاسم ورقم الهاتف." });
@@ -981,7 +949,7 @@ app.post("/api/auth/login-existing-customer", (req, res) => {
   const cleanEnteredPhone = cleanPhone(phone);
   const normEnteredName = normalizeArabic(name);
 
-  const db = readDb();
+  const db = await readDb();
   const customers = db.registeredCustomers || [];
 
   // Find the customer by email
@@ -1022,7 +990,7 @@ app.post("/api/auth/login-existing-customer", (req, res) => {
       personalityAnalysis: "نظراتك الثاقبة وملامحك الواثقة تدل على ذوق فرنسي رفيع يبحث عن النكهات المتوازنة والتفاصيل الفاخرة المتقنة.",
       recommendedDish: "سماش برجر المشروم والترفل الفاخر"
     };
-    writeDb(db);
+    await writeDb(db);
   }
 
   // Successful login, log them as a visitor
@@ -1038,7 +1006,7 @@ app.post("/api/auth/login-existing-customer", (req, res) => {
   };
   if (!db.visitors) db.visitors = [];
   db.visitors.unshift(newVisitor);
-  writeDb(db);
+  await writeDb(db);
 
   res.json({
     success: true,
@@ -1053,24 +1021,24 @@ app.post("/api/auth/login-existing-customer", (req, res) => {
   });
 });
 
-app.get("/api/registered-customers", requireDeveloper, (req, res) => {
-  const db = readDb();
+app.get("/api/registered-customers", requireDeveloper, async (req, res) => {
+  const db = await readDb();
   res.json(db.registeredCustomers || []);
 });
 
-app.get("/api/blocked-customers", requireDeveloper, (req, res) => {
-  const db = readDb();
+app.get("/api/blocked-customers", requireDeveloper, async (req, res) => {
+  const db = await readDb();
   res.json(db.blockedCustomers || []);
 });
 
-app.post("/api/block-customer", requireDeveloper, (req, res) => {
+app.post("/api/block-customer", requireDeveloper, async (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: "Email is required to block a customer." });
   }
 
   const cleanEmail = email.trim().toLowerCase();
-  const db = readDb();
+  const db = await readDb();
 
   const customerIndex = (db.registeredCustomers || []).findIndex(c => c.email.toLowerCase() === cleanEmail);
   if (customerIndex === -1) {
@@ -1084,18 +1052,18 @@ app.post("/api/block-customer", requireDeveloper, (req, res) => {
     db.blockedCustomers.unshift(customerToBlock);
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, registeredCustomers: db.registeredCustomers, blockedCustomers: db.blockedCustomers });
 });
 
-app.post("/api/unblock-customer", requireDeveloper, (req, res) => {
+app.post("/api/unblock-customer", requireDeveloper, async (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: "Email is required to unblock a customer." });
   }
 
   const cleanEmail = email.trim().toLowerCase();
-  const db = readDb();
+  const db = await readDb();
 
   const blockedIndex = (db.blockedCustomers || []).findIndex(b => b.email.toLowerCase() === cleanEmail);
   if (blockedIndex === -1) {
@@ -1109,39 +1077,39 @@ app.post("/api/unblock-customer", requireDeveloper, (req, res) => {
     db.registeredCustomers.unshift(unblockedCust);
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, registeredCustomers: db.registeredCustomers, blockedCustomers: db.blockedCustomers });
 });
 
-app.get("/api/email-logs", requireDeveloper, (req, res) => {
-  const db = readDb();
+app.get("/api/email-logs", requireDeveloper, async (req, res) => {
+  const db = await readDb();
   res.json(db.emailLogs || []);
 });
 
 // 4.6 Newsletter & Gmail Subscribers API
-app.post("/api/subscribe", (req, res) => {
+app.post("/api/subscribe", async (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: "Email is required" });
   }
   const cleanEmail = email.trim().toLowerCase();
-  const db = readDb();
+  const db = await readDb();
   if (!db.subscribers) db.subscribers = [];
   if (!db.subscribers.includes(cleanEmail)) {
     db.subscribers.push(cleanEmail);
-    writeDb(db);
+    await writeDb(db);
   }
   res.json({ success: true, subscribers: db.subscribers });
 });
 
-app.get("/api/subscribers", requireDeveloper, (req, res) => {
-  const db = readDb();
+app.get("/api/subscribers", requireDeveloper, async (req, res) => {
+  const db = await readDb();
   res.json(db.subscribers || []);
 });
 
-app.post("/api/send-newsletter", requireDeveloper, (req, res) => {
+app.post("/api/send-newsletter", requireDeveloper, async (req, res) => {
   const { subject, body } = req.body;
-  const db = readDb();
+  const db = await readDb();
   const subs = db.subscribers || [];
   
   console.log(`[SIMULATION] Dispatching newsletter to ${subs.length} emails:`);
@@ -1153,52 +1121,52 @@ app.post("/api/send-newsletter", requireDeveloper, (req, res) => {
 });
 
 // 5. Visitors logs (accessible to Developer only)
-app.get("/api/visitors", requireDeveloper, (req, res) => {
-  const db = readDb();
+app.get("/api/visitors", requireDeveloper, async (req, res) => {
+  const db = await readDb();
   res.json(db.visitors);
 });
 
-app.delete("/api/visitors", requireDeveloper, (req, res) => {
-  const db = readDb();
+app.delete("/api/visitors", requireDeveloper, async (req, res) => {
+  const db = await readDb();
   db.visitors = [];
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, visitors: [] });
 });
 
 // 6. Page Views Count API
-app.get("/api/pageviews", (req, res) => {
-  const db = readDb();
+app.get("/api/pageviews", async (req, res) => {
+  const db = await readDb();
   res.json({ count: db.pageViews || 0 });
 });
 
-app.post("/api/pageviews/increment", (req, res) => {
-  const db = readDb();
+app.post("/api/pageviews/increment", async (req, res) => {
+  const db = await readDb();
   db.pageViews = (db.pageViews || 0) + 1;
-  writeDb(db);
+  await writeDb(db);
   res.json({ count: db.pageViews });
 });
 
-app.post("/api/orders/next-number", (req, res) => {
-  const db = readDb();
+app.post("/api/orders/next-number", async (req, res) => {
+  const db = await readDb();
   const nextNum = (db.orderCounter || 0) + 1;
   db.orderCounter = nextNum;
-  writeDb(db);
+  await writeDb(db);
   res.json({ orderNumber: nextNum });
 });
 
 // 7. Dynamic Sections/Categories API
-app.get("/api/categories", (req, res) => {
-  const db = readDb();
+app.get("/api/categories", async (req, res) => {
+  const db = await readDb();
   res.json(db.categories || DEFAULT_CATEGORIES);
 });
 
-app.post("/api/categories", requireManagerOrDeveloper, (req, res) => {
+app.post("/api/categories", requireManagerOrDeveloper, async (req, res) => {
   const { id, name, icon } = req.body;
   if (!id || !name || !name.ar || !name.en || !name.fr || !name.it) {
     return res.status(400).json({ error: "id and names in all 4 languages are required." });
   }
 
-  const db = readDb();
+  const db = await readDb();
   if (!db.categories) {
     db.categories = [...DEFAULT_CATEGORIES];
   }
@@ -1209,30 +1177,30 @@ app.post("/api/categories", requireManagerOrDeveloper, (req, res) => {
   }
 
   db.categories.push({ id, name, icon: icon || "Utensils" });
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, categories: db.categories });
 });
 
-app.delete("/api/categories/:id", requireManagerOrDeveloper, (req, res) => {
+app.delete("/api/categories/:id", requireManagerOrDeveloper, async (req, res) => {
   const categoryId = req.params.id;
-  const db = readDb();
+  const db = await readDb();
   if (!db.categories) {
     db.categories = [...DEFAULT_CATEGORIES];
   }
 
   db.categories = db.categories.filter(c => c.id !== categoryId);
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, categories: db.categories });
 });
 
-app.put("/api/categories/:id", requireManagerOrDeveloper, (req, res) => {
+app.put("/api/categories/:id", requireManagerOrDeveloper, async (req, res) => {
   const categoryId = req.params.id;
   const { name, icon } = req.body;
   if (!name || !name.ar || !name.en || !name.fr || !name.it) {
     return res.status(400).json({ error: "Names in all 4 languages are required." });
   }
 
-  const db = readDb();
+  const db = await readDb();
   if (!db.categories) {
     db.categories = [...DEFAULT_CATEGORIES];
   }
@@ -1248,23 +1216,23 @@ app.put("/api/categories/:id", requireManagerOrDeveloper, (req, res) => {
     icon: icon || db.categories[idx].icon || "utensils"
   };
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, categories: db.categories });
 });
 
 // 7.5. Products & Offers Endpoints with Smart Sync Restore
-app.get("/api/products", (req, res) => {
-  const db = readDb();
+app.get("/api/products", async (req, res) => {
+  const db = await readDb();
   res.json(db.products || []);
 });
 
-app.post("/api/products", requireManagerOrDeveloper, (req, res) => {
+app.post("/api/products", requireManagerOrDeveloper, async (req, res) => {
   const product = req.body;
   if (!product || !product.id) {
     return res.status(400).json({ error: "بيانات المنتج غير صالحة." });
   }
 
-  const db = readDb();
+  const db = await readDb();
   if (!db.products) db.products = [];
 
   const index = db.products.findIndex(p => p.id === product.id);
@@ -1274,69 +1242,69 @@ app.post("/api/products", requireManagerOrDeveloper, (req, res) => {
     db.products.push(product);
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, products: db.products });
 });
 
-app.delete("/api/products/:id", requireManagerOrDeveloper, (req, res) => {
+app.delete("/api/products/:id", requireManagerOrDeveloper, async (req, res) => {
   const id = req.params.id;
-  const db = readDb();
+  const db = await readDb();
   if (!db.products) db.products = [];
 
   db.products = db.products.filter(p => p.id !== id);
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, products: db.products });
 });
 
-app.post("/api/products/delete-all", requireManagerOrDeveloper, (req, res) => {
-  const db = readDb();
+app.post("/api/products/delete-all", requireManagerOrDeveloper, async (req, res) => {
+  const db = await readDb();
   db.products = [];
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, products: [] });
 });
 
-app.post("/api/products/bulk-sync", requireManagerOrDeveloper, (req, res) => {
+app.post("/api/products/bulk-sync", requireManagerOrDeveloper, async (req, res) => {
   const { products } = req.body;
   if (!Array.isArray(products)) {
     return res.status(400).json({ error: "مصفوفة المنتجات مطلوبة للمزامنة." });
   }
-  const db = readDb();
+  const db = await readDb();
   db.products = products;
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, products: db.products });
 });
 
-app.get("/api/offers", (req, res) => {
-  const db = readDb();
+app.get("/api/offers", async (req, res) => {
+  const db = await readDb();
   res.json({
     exclusiveOffer: db.exclusiveOffer || null,
     weeklyOffers: db.weeklyOffers || []
   });
 });
 
-app.post("/api/offers/exclusive", requireManagerOrDeveloper, (req, res) => {
+app.post("/api/offers/exclusive", requireManagerOrDeveloper, async (req, res) => {
   const offer = req.body;
-  const db = readDb();
+  const db = await readDb();
   db.exclusiveOffer = offer;
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, exclusiveOffer: db.exclusiveOffer });
 });
 
-app.post("/api/offers/weekly", requireManagerOrDeveloper, (req, res) => {
+app.post("/api/offers/weekly", requireManagerOrDeveloper, async (req, res) => {
   const { weeklyOffers } = req.body;
   if (!Array.isArray(weeklyOffers)) {
     return res.status(400).json({ error: "مصفوفة العروض الأسبوعية مطلوبة." });
   }
-  const db = readDb();
+  const db = await readDb();
   db.weeklyOffers = weeklyOffers;
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, weeklyOffers: db.weeklyOffers });
 });
 
 // Bulk database backup restore when server resets/updates
-app.post("/api/db/sync-restore", requireManagerOrDeveloper, (req, res) => {
+app.post("/api/db/sync-restore", requireManagerOrDeveloper, async (req, res) => {
   const { products, categories, registeredCustomers, blockedCustomers, managers, subscribers, emailLogs, orderCounter } = req.body;
-  const db = readDb();
+  const db = await readDb();
 
   let restoredCount = 0;
 
@@ -1403,7 +1371,7 @@ app.post("/api/db/sync-restore", requireManagerOrDeveloper, (req, res) => {
     restoredCount++;
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, message: `Successfully synced ${restoredCount} database tables to server.` });
 });
 
@@ -1511,12 +1479,12 @@ Text to translate:
 });
 
 // --- Restaurant Reviews & Interactive Discussions ---
-app.get("/api/reviews", (req, res) => {
-  const db = readDb();
+app.get("/api/reviews", async (req, res) => {
+  const db = await readDb();
   res.json(db.reviews || []);
 });
 
-app.post("/api/reviews", (req, res) => {
+app.post("/api/reviews", async (req, res) => {
   const { rating, comment, userEmail, userName, userPicture, role } = req.body;
   if (!userEmail || !userName) {
     return res.status(400).json({ error: "اسم المستخدم والبريد الإلكتروني مطلوبين لكتابة تقييم." });
@@ -1526,7 +1494,7 @@ app.post("/api/reviews", (req, res) => {
     return res.status(400).json({ error: "التقييم يجب أن يكون بين 1 و 5 نجوم." });
   }
 
-  const db = readDb();
+  const db = await readDb();
   db.reviews = db.reviews || [];
 
   const newReview: RestaurantReview = {
@@ -1542,11 +1510,11 @@ app.post("/api/reviews", (req, res) => {
   };
 
   db.reviews.unshift(newReview);
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, reviews: db.reviews });
 });
 
-app.post("/api/reviews/:id/replies", (req, res) => {
+app.post("/api/reviews/:id/replies", async (req, res) => {
   const reviewId = req.params.id;
   const { text, userEmail, userName, userPicture, role } = req.body;
   if (!text) {
@@ -1556,7 +1524,7 @@ app.post("/api/reviews/:id/replies", (req, res) => {
     return res.status(400).json({ error: "بيانات المستخدم مطلوبة للمشاركة في المناقشة." });
   }
 
-  const db = readDb();
+  const db = await readDb();
   db.reviews = db.reviews || [];
 
   const review = db.reviews.find(r => r.id === reviewId);
@@ -1575,27 +1543,27 @@ app.post("/api/reviews/:id/replies", (req, res) => {
   };
 
   review.replies.push(newReply);
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, reviews: db.reviews });
 });
 
-app.delete("/api/reviews/:id", requireManagerOrDeveloper, (req, res) => {
+app.delete("/api/reviews/:id", requireManagerOrDeveloper, async (req, res) => {
   const id = req.params.id;
-  const db = readDb();
+  const db = await readDb();
   db.reviews = db.reviews || [];
   db.reviews = db.reviews.filter(r => r.id !== id);
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, reviews: db.reviews });
 });
 
-app.delete("/api/reviews/:reviewId/replies/:replyId", requireManagerOrDeveloper, (req, res) => {
+app.delete("/api/reviews/:reviewId/replies/:replyId", requireManagerOrDeveloper, async (req, res) => {
   const { reviewId, replyId } = req.params;
-  const db = readDb();
+  const db = await readDb();
   db.reviews = db.reviews || [];
   const review = db.reviews.find(r => r.id === reviewId);
   if (review) {
     review.replies = review.replies.filter(rep => rep.id !== replyId);
-    writeDb(db);
+    await writeDb(db);
   }
   res.json({ success: true, reviews: db.reviews });
 });
@@ -1615,7 +1583,7 @@ app.post("/api/ai/copilot", requireManagerOrDeveloper, async (req, res) => {
       return res.status(500).json({ error: "مفتاح الذكاء الاصطناعي غير متوفر حالياً على الخادم." });
     }
 
-    const db = readDb();
+    const db = await readDb();
     const ai = getGeminiClient();
 
     // Prepare a compact representation of the DB to avoid token bloat
@@ -1828,7 +1796,7 @@ ${JSON.stringify(dbContext, null, 2)}`;
     }
 
     if (updated) {
-      writeDb(db);
+      await writeDb(db);
     }
 
     res.json({
@@ -1866,7 +1834,7 @@ async function startServer() {
     // Serve static files in production
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.get("*", async (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
@@ -1876,4 +1844,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
