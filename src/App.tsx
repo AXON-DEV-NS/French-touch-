@@ -82,6 +82,8 @@ const safeSessionStorage = {
   }
 };
 
+import { compressImage } from './utils/imageCompressor';
+
 export default function App() {
   // --- Landing Screen Entry State ---
   const [entered, setEntered] = useState(() => {
@@ -1113,7 +1115,7 @@ ${itemsList}
   }, 0);
 
   return (
-    <div className={`min-h-screen bg-brand-cream text-brand-charcoal flex flex-col justify-between selection:bg-brand-gold selection:text-brand-blue ${currentLangDir === 'rtl' ? 'ar-dir' : 'ltr-dir'}`}>
+    <div className={`min-h-[100dvh] bg-brand-cream text-brand-charcoal flex flex-col justify-between selection:bg-brand-gold selection:text-brand-blue ${currentLangDir === 'rtl' ? 'ar-dir' : 'ltr-dir'}`}>
       
       {/* 1. TOP MARGIN FRENCH FLAG DECORATIVE RIBBON */}
       <div className="w-full h-1.5 flex flex-row shrink-0">
@@ -1874,8 +1876,8 @@ ${itemsList}
                   {/* LOADING OVERLAY WHILE GEMINI CHECKS THE PICTURE */}
                   {regLoading && (
                     <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200">
-                      <div className="w-16 h-16 rounded-full border-4 border-brand-gold border-t-brand-blue animate-spin mb-4"></div>
-                      <h4 className="serif-heading text-lg font-black text-brand-blue mb-2">
+                      <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full border-[3px] border-brand-gold border-t-brand-blue animate-spin mb-3"></div>
+                      <h4 className="serif-heading text-base sm:text-lg font-black text-brand-blue mb-2">
                         {currentLang === 'ar' ? '🔮 فحص ملامح الوجه بالذكاء الاصطناعي' : '🔮 AI Facial Feature Inspection'}
                       </h4>
                       <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
@@ -2317,15 +2319,20 @@ ${itemsList}
                                   type="file" 
                                   accept="image/*" 
                                   required
-                                  onChange={(e) => {
+                                  onChange={async (e) => {
                                     const file = e.target.files?.[0];
                                     if (!file) return;
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => {
-                                      setRegPicture(reader.result as string);
+                                    try {
+                                      setRegLoading(true);
+                                      const compressedBase64 = await compressImage(file);
+                                      setRegPicture(compressedBase64);
                                       setRegError('');
-                                    };
-                                    reader.readAsDataURL(file);
+                                    } catch (err) {
+                                      console.error("Compression error:", err);
+                                      setRegError(currentLang === 'ar' ? 'فشل معالجة الصورة، يرجى المحاولة بصورة أخرى.' : 'Image processing failed.');
+                                    } finally {
+                                      setRegLoading(false);
+                                    }
                                   }}
                                   className="absolute inset-0 opacity-0 cursor-pointer z-10"
                                 />

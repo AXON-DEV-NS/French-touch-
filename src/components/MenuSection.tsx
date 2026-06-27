@@ -107,7 +107,29 @@ export default function MenuSection({
 
   return (
     <div className="space-y-8" id="menu-section">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-4 border-b border-gray-100">
+      {/* Category Tabs at the Top */}
+      <div className="sticky top-0 z-20 bg-brand-cream/90 backdrop-blur-md pt-4 pb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex overflow-x-auto hide-scrollbar gap-3 justify-start sm:justify-center py-2">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`flex-shrink-0 flex items-center gap-2.5 px-6 py-3.5 rounded-full text-[13px] font-bold transition-all duration-300 ${
+                selectedCategory === cat.id
+                  ? 'bg-brand-blue text-brand-cream shadow-xl scale-[1.05] ring-2 ring-brand-gold/30'
+                  : 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 shadow-sm hover:shadow'
+              }`}
+            >
+              <span className={`text-lg ${selectedCategory === cat.id ? 'text-brand-gold' : 'text-slate-400'}`}>
+                {getCategoryIcon(cat.icon)}
+              </span>
+              <span className="whitespace-nowrap">{cat.name[currentLang] || cat.id}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-4 border-b border-slate-200/50">
         <div>
           <h2 className="serif-heading text-3xl md:text-4xl font-extrabold text-brand-blue flex items-center gap-2">
             {t.menu}
@@ -123,26 +145,6 @@ export default function MenuSection({
               : 'Savor the most exquisite flavors, prepared with ultimate passion.'}
           </p>
         </div>
-      </div>
-
-      {/* Category Tabs */}
-      <div className="flex flex-wrap gap-2.5 justify-start md:justify-center">
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setSelectedCategory(cat.id)}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold transition-all duration-300 ${
-              selectedCategory === cat.id
-                ? 'bg-brand-blue text-brand-cream shadow-md scale-[1.03]'
-                : 'bg-white hover:bg-gray-50 text-gray-600 border border-gray-100'
-            }`}
-          >
-            <span className={selectedCategory === cat.id ? 'text-brand-gold' : 'text-gray-400'}>
-              {getCategoryIcon(cat.icon)}
-            </span>
-            {cat.name[currentLang] || cat.id}
-          </button>
-        ))}
       </div>
 
       {/* Menu Grid */}

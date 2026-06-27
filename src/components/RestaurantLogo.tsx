@@ -20,7 +20,7 @@ export default function RestaurantLogo({ className = '', light = false }: Restau
     >
       <svg
         viewBox="0 0 320 95"
-        className="w-full h-auto max-w-[260px] md:max-w-[300px]"
+        className="w-full h-auto max-w-[200px] md:max-w-[240px]"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         dir="ltr"

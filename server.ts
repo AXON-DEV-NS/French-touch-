@@ -641,7 +641,7 @@ Arabic examples of reasons:
 `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: { parts: [imagePart, { text: promptText }] },
       config: {
         responseMimeType: "application/json",
@@ -767,7 +767,7 @@ Respond strictly in JSON format:
     parts.push({ text: promptText });
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: { parts },
       config: {
         responseMimeType: "application/json",
@@ -1400,7 +1400,7 @@ app.post("/api/translate", async (req, res) => {
 
     const ai = getGeminiClient();
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: `You are an expert culinary translator. Translate the following restaurant menu item name, description, or section title into ${target}. 
 
 Rules:
@@ -1437,7 +1437,7 @@ app.post("/api/translate-all", async (req, res) => {
 
     const ai = getGeminiClient();
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: `You are an expert multilingual culinary translator for a high-end gourmet restaurant/cafe. 
 Identify the language of the following text and translate it into Arabic (العربية), English, French (Français), and Italian (Italiano).
 
@@ -1727,7 +1727,7 @@ ${JSON.stringify(dbContext, null, 2)}`;
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         systemInstruction: systemPrompt,

@@ -159,7 +159,7 @@ export default function LanguageLandingScreen({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.6 }}
-          className="mb-4 sm:mb-6 scale-95 sm:scale-110 md:scale-125"
+          className="mb-4 sm:mb-6 scale-100 sm:scale-110 md:scale-125"
         >
           <RestaurantLogo light />
         </motion.div>
