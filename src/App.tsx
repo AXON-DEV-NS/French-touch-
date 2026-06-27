@@ -146,7 +146,7 @@ export default function App() {
 
   // --- Current Signed in User State ---
   const [currentUser, setCurrentUser] = useState<{ email: string; name: string; picture?: string; role: 'Developer' | 'Manager' | 'Customer'; lang?: Language } | null>(() => {
-    const saved = safeSessionStorage.getItem('frenchtouch_current_user');
+    const saved = safeStorage.getItem('frenchtouch_current_user') || safeSessionStorage.getItem('frenchtouch_current_user');
     return saved ? JSON.parse(saved) : null;
   });
 
@@ -525,8 +525,9 @@ export default function App() {
 
   useEffect(() => {
     if (currentUser) {
-      safeSessionStorage.setItem('frenchtouch_current_user', JSON.stringify(currentUser));
+      safeStorage.setItem('frenchtouch_current_user', JSON.stringify(currentUser));
     } else {
+      safeStorage.removeItem('frenchtouch_current_user');
       safeSessionStorage.removeItem('frenchtouch_current_user');
     }
   }, [currentUser]);
