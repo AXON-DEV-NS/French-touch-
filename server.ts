@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { kv } from "@vercel/kv";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { sendEmailOtp, sendPhoneOtp } from "./server/sendOtpService";
 
@@ -162,6 +161,8 @@ const DEFAULT_CATEGORIES = [
   { id: "drinks", name: { ar: "المشروبات المنعشة", en: "Refreshing Drinks", fr: "Boissons", it: "Bevande" }, icon: "GlassWater" }
 ];
 
+let memoryDb: DbSchema | null = null;
+
 // Read database helper
 async function readDb(): Promise<DbSchema> {
   const initialDb: DbSchema = {
@@ -185,29 +186,34 @@ async function readDb(): Promise<DbSchema> {
       return initialDb;
     }
 
+    if (memoryDb) return memoryDb;
+
     if (!fs.existsSync(DB_FILE)) {
-      fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2));
+      memoryDb = initialDb;
+      try { fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2)); } catch (e) {}
       return initialDb;
     }
     const content = fs.readFileSync(DB_FILE, "utf-8");
     const parsed = JSON.parse(content);
     
-    return { ...initialDb, ...parsed };
+    memoryDb = { ...initialDb, ...parsed };
+    return memoryDb;
   } catch (error) {
     console.error("Error reading database:", error);
-    return initialDb;
+    return memoryDb || initialDb;
   }
 }
 
 async function writeDb(data: DbSchema) {
   try {
+    memoryDb = data; // Always update in-memory cache
     if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
       await kv.set("frenchtouch_db", data);
       return;
     }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (error) {
-    console.error("Error writing database:", error);
+    console.error("Error writing database (using memory fallback on Vercel):", error);
   }
 }
 // ----------------------------------------------------
@@ -1678,11 +1684,16 @@ ${JSON.stringify(dbContext, null, 2)}`;
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     // Load Vite in Middleware mode
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa"
-    });
-    app.use(vite.middlewares);
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa"
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.warn("Vite not found, skipping dev middleware");
+    }
   } else {
     // Serve static files in production
     const distPath = path.join(process.cwd(), "dist");
