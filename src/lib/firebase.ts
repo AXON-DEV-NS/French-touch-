@@ -1,4 +1,5 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 import { 
   getAuth, 
   initializeAuth, 
@@ -10,17 +11,19 @@ import {
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCsXBRqYXnVmV8p_M-tQfdJuAfuY-ADWGo",
-  authDomain: "french-touch-9e02b.firebaseapp.com",
-  projectId: "french-touch-9e02b",
-  storageBucket: "french-touch-9e02b.firebasestorage.app",
-  messagingSenderId: "162224246102",
-  appId: "1:162224246102:web:3888ec39aaf4e16c585af7",
-  measurementId: "G-4N2LLM558H"
+  projectId: "gen-lang-client-0447591345",
+  appId: "1:1047666840859:web:8d9938fad9ed225339efbe",
+  apiKey: "AIzaSyDHyK14UAnuxfrREq80KIA-s5Ks9qKlN3s",
+  authDomain: "gen-lang-client-0447591345.firebaseapp.com",
+  storageBucket: "gen-lang-client-0447591345.firebasestorage.app",
+  messagingSenderId: "1047666840859",
+  measurementId: ""
 };
 
 // Initialize Firebase safely to prevent re-initialization errors
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+export const db = getFirestore(app, "ai-studio-franchtouch-c185637b-7de9-4621-bd19-1411605bdf0f");
 
 // Safe storage availability check
 function isStorageAvailable(): boolean {

@@ -2052,476 +2052,92 @@ ${itemsList}
                     </div>
                   ) : (
                     <div className="space-y-6">
-                          {/* Form Tabs */}
-                          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/40">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAuthFormTab('register');
-                            setRegError('');
-                          }}
-                          className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                            authFormTab === 'register'
-                              ? 'bg-white text-brand-blue shadow-sm'
-                              : 'text-slate-500 hover:text-slate-800'
-                          }`}
-                        >
-                          {currentLang === 'ar' ? '✨ إنشاء حساب جديد' : '✨ Register New'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAuthFormTab('login');
-                            setRegError('');
-                          }}
-                          className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                            authFormTab === 'login'
-                              ? 'bg-white text-brand-blue shadow-sm'
-                              : 'text-slate-500 hover:text-slate-800'
-                          }`}
-                        >
-                          {currentLang === 'ar' ? '🔑 لدي حساب مسجل' : '🔑 Existing Account'}
-                        </button>
+                      <div className="text-center space-y-3">
+                        <span className="inline-block p-4 bg-brand-gold/10 rounded-full text-2xl mb-2">🍽️</span>
+                        <h3 className="serif-heading text-xl md:text-2xl font-extrabold text-brand-blue">
+                          {currentLang === 'ar' ? 'سجل دخولك لتجربة فرنش تاتش' : 'Sign in to French Touch'}
+                        </h3>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                          {currentLang === 'ar' 
+                            ? 'سجل دخولك بحساب جوجل لتتمكن من حجز الطاولات، طلب الأطباق، ومتابعة سجل طلباتك.' 
+                            : 'Sign in with your Google account to manage reservations, order dishes, and view your history.'}
+                        </p>
                       </div>
 
-                      {authFormTab === 'register' ? (
-                        <>
-                          <div className="text-center space-y-2">
-                            <span className="inline-block p-2 bg-brand-gold/10 rounded-full text-lg">✨</span>
-                            <h3 className="serif-heading text-xl font-extrabold text-brand-blue">
-                              {currentLang === 'ar' ? 'إنشاء حساب زبون جديد فخم' : 'Register Gourmet Customer Account'}
-                            </h3>
-                            <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                              {currentLang === 'ar' 
-                                ? 'سجل حسابك مجاناً لتتمكن من الطلب وحجز الطاولات، وستصلك جميع عروضنا والمنتجات الجديدة تلقائياً وإجبارياً على بريدك الإلكتروني.' 
-                                : 'Sign up to manage table reservations, order dishes, and auto-subscribe to premium emails.'}
-                            </p>
+                      {regError && (
+                        <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-brand-red leading-relaxed flex items-start gap-2 animate-shake">
+                          <span className="text-sm">⚠️</span>
+                          <div className="text-start">
+                            <span className="font-bold block mb-0.5">{currentLang === 'ar' ? 'حدث خطأ:' : 'Error:'}</span>
+                            {regError}
                           </div>
-
-                          {regError && (
-                            <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-brand-red leading-relaxed flex items-start gap-2 animate-shake">
-                              <span className="text-sm">⚠️</span>
-                              <div className="text-start">
-                                <span className="font-bold block mb-0.5">{currentLang === 'ar' ? 'حدث خطأ في التسجيل:' : 'Registration Refused:'}</span>
-                                {regError}
-                              </div>
-                            </div>
-                          )}
-
-                          <form 
-                            onSubmit={async (e) => {
-                              e.preventDefault();
-                              if (!regFirstName || !regSecondName || !regThirdName || !regEmail || !regPhone || !regAltPhone) {
-                                setRegError(currentLang === 'ar' ? 'يرجى إدخال كافة المعلومات النصية المطلوبة أولاً.' : 'Please enter all required text fields.');
-                                return;
-                              }
-                              if (!checkEgyptianPhone(regPhone)) {
-                                setRegError(currentLang === 'ar' 
-                                  ? 'رقم الهاتف الأساسي غير صحيح! يجب إدخال رقم هاتف محمول مصري حقيقي نشط (مكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015).' 
-                                  : 'Invalid primary phone! Must be a real Egyptian mobile number starting with 010, 011, 012, or 015 (11 digits).');
-                                return;
-                              }
-                              if (!checkEgyptianPhone(regAltPhone)) {
-                                setRegError(currentLang === 'ar' 
-                                  ? 'رقم الهاتف الاحتياطي غير صحيح! يجب إدخال رقم هاتف محمول مصري حقيقي احتياطي مختلف (مكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015).' 
-                                  : 'Invalid alternative phone! Must be a real Egyptian mobile number starting with 010, 011, 012, or 015 (11 digits).');
-                                return;
-                              }
-                              if (regPhone.replace(/\D/g, "") === regAltPhone.replace(/\D/g, "")) {
-                                setRegError(currentLang === 'ar' 
-                                  ? 'رقم الهاتف الاحتياطي يجب أن يكون مختلفاً تماماً عن رقم الهاتف الأساسي.' 
-                                  : 'Alternative phone number must be different from primary phone number.');
-                                return;
-                              }
-                              if (!regPicture) {
-                                setRegError(currentLang === 'ar' ? 'صورة الحساب الشخصي إجبارية! يرجى رفع صورة واضحة لوجهك الشخصي.' : 'Profile picture is mandatory! Please upload a clear photo.');
-                                return;
-                              }
-
-                              setRegLoading(true);
-                              setRegError('');
-
-                              try {
-                                const response = await fetch('/api/auth/register-customer', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    firstName: regFirstName,
-                                    secondName: regSecondName,
-                                    thirdName: regThirdName,
-                                    email: regEmail,
-                                    phone: regPhone,
-                                    alternativePhone: regAltPhone,
-                                    picture: regPicture
-                                  })
-                                });
-
-                                const data = await response.json();
-                                if (response.ok && data.success) {
-                                  if (data.requiresVerification) {
-                                    setVerificationFlow({
-                                      active: true,
-                                      step: 'email',
-                                      sessionId: data.sessionId,
-                                      email: regEmail,
-                                      phone: regPhone,
-                                      otpInput: ''
-                                    });
-                                  } else {
-                                    // Fallback for direct login (if no verification required)
-                                    setRegFirstName('');
-                                    setRegSecondName('');
-                                    setRegThirdName('');
-                                    setRegEmail('');
-                                    setRegPhone('');
-                                    setRegAltPhone('');
-                                    setRegPicture('');
-                                    handleLoginSuccess(data.user);
-                                  }
-                                } else {
-                                  setRegError(data.error || 'Registration failed');
-                                }
-                              } catch (err) {
-                                console.error(err);
-                                setRegError(currentLang === 'ar' ? 'فشل الاتصال بالخادم لمراجعة الصورة والبيانات.' : 'Server connection failed.');
-                              } finally {
-                                setRegLoading(false);
-                              }
-                            }} 
-                            className="space-y-4"
-                          >
-                            {/* TRIPLE NAME FIELDS */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <div>
-                                <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                                  {currentLang === 'ar' ? 'الاسم الأول *' : 'First Name *'}
-                                </label>
-                                <input
-                                  type="text"
-                                  required
-                                  value={regFirstName}
-                                  onChange={(e) => setRegFirstName(e.target.value)}
-                                  placeholder={currentLang === 'ar' ? 'مثال: أحمد' : 'e.g. Ahmad'}
-                                  className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                                  {currentLang === 'ar' ? 'الاسم الثاني *' : 'Second Name *'}
-                                </label>
-                                <input
-                                  type="text"
-                                  required
-                                  value={regSecondName}
-                                  onChange={(e) => setRegSecondName(e.target.value)}
-                                  placeholder={currentLang === 'ar' ? 'مثال: محمد' : 'e.g. Mohamed'}
-                                  className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                                  {currentLang === 'ar' ? 'الاسم الثالث *' : 'Third Name *'}
-                                </label>
-                                <input
-                                  type="text"
-                                  required
-                                  value={regThirdName}
-                                  onChange={(e) => setRegThirdName(e.target.value)}
-                                  placeholder={currentLang === 'ar' ? 'مثال: علي' : 'e.g. Ali'}
-                                  className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm"
-                                />
-                              </div>
-                            </div>
-
-                            {/* EMAIL / GMAIL */}
-                            <div>
-                              <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                                {currentLang === 'ar' ? 'البريد الإلكتروني (الجيميل الخاص بك) *' : 'Gmail Address *'}
-                              </label>
-                              <input
-                                type="email"
-                                required
-                                value={regEmail}
-                                onChange={(e) => setRegEmail(e.target.value)}
-                                placeholder="example@gmail.com"
-                                className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm font-mono"
-                              />
-                            </div>
-
-                            {/* PHONE NUMBERS INSTRUCTIONAL BANNER */}
-                            <div className="bg-gradient-to-br from-amber-50/80 to-amber-100/40 border border-amber-200/80 rounded-2xl p-4 text-start space-y-1.5 shadow-sm">
-                              <div className="flex items-center gap-1.5 text-xs font-black text-amber-800">
-                                <span className="text-sm">🇪🇬</span>
-                                <span>{currentLang === 'ar' ? 'تعليمات وإرشادات هامة لأرقام الهواتف:' : 'Egyptian Phone Verification Rules:'}</span>
-                              </div>
-                              <ul className="text-[10px] text-amber-700 leading-relaxed font-semibold list-disc list-inside space-y-1">
-                                {currentLang === 'ar' ? (
-                                  <>
-                                    <li>يجب أن تكون أرقام الهواتف تابعة لشبكات الاتصالات المصرية (فودافون، أورانج، اتصالات، وي).</li>
-                                    <li>يجب إدخال الأرقام بالصيغة المحلية المكونة من 11 رقماً (مثل: <span className="font-mono bg-white/60 px-1 rounded text-amber-900">01012345678</span>).</li>
-                                    <li>يجب أن يكون الهاتف الأساسي نشطاً لاستقبال إيصال الأوردر عبر الواتساب.</li>
-                                    <li>يُمنع منعاً باتاً تكرار نفس الرقم في حقل الهاتف الأساسي والاحتياطي.</li>
-                                  </>
-                                ) : (
-                                  <>
-                                    <li>Phone numbers must belong to standard Egyptian mobile networks (Vodafone, Orange, Etisalat, WE).</li>
-                                    <li>Use the 11-digit local format (e.g., <span className="font-mono bg-white/60 px-1 rounded text-amber-900">01012345678</span>).</li>
-                                    <li>The primary phone must have active WhatsApp to accept gourmet order receipts.</li>
-                                    <li>Primary and alternative phone numbers must be completely distinct.</li>
-                                  </>
-                                )}
-                              </ul>
-                            </div>
-
-                            {/* PHONE NUMBERS */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-start">
-                              <div>
-                                <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                                  {currentLang === 'ar' ? 'رقم الهاتف الأساسي *' : 'Primary Phone *'}
-                                </label>
-                                <input
-                                  type="tel"
-                                  required
-                                  value={regPhone}
-                                  onChange={(e) => setRegPhone(e.target.value)}
-                                  placeholder="01xxxxxxxxx"
-                                  className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm font-mono"
-                                />
-                                {regPhone && (
-                                  <div className="mt-1 text-[9px] font-bold">
-                                    {checkEgyptianPhone(regPhone) ? (
-                                      <span className="text-emerald-600 flex items-center gap-1">✓ {currentLang === 'ar' ? 'رقم محمول مصري معتمد' : 'Approved Egyptian mobile'}</span>
-                                    ) : (
-                                      <span className="text-rose-500 flex items-center gap-1">⚠️ {currentLang === 'ar' ? 'يرجى إدخال رقم هاتف مصري حقيقي (11 رقم)' : 'Enter 11-digit Egyptian phone'}</span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                                  {currentLang === 'ar' ? 'رقم هاتف احتياطي مختلف *' : 'Alternative Phone *'}
-                                </label>
-                                <input
-                                  type="tel"
-                                  required
-                                  value={regAltPhone}
-                                  onChange={(e) => setRegAltPhone(e.target.value)}
-                                  placeholder="01xxxxxxxxx"
-                                  className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm font-mono"
-                                />
-                                {regAltPhone && (
-                                  <div className="mt-1 text-[9px] font-bold">
-                                    {checkEgyptianPhone(regAltPhone) ? (
-                                      regPhone && regPhone.replace(/\D/g, "") === regAltPhone.replace(/\D/g, "") ? (
-                                        <span className="text-rose-500 flex items-center gap-1">⚠️ {currentLang === 'ar' ? 'يجب أن يكون مختلفاً عن الهاتف الأساسي' : 'Must differ from primary phone'}</span>
-                                      ) : (
-                                        <span className="text-emerald-600 flex items-center gap-1">✓ {currentLang === 'ar' ? 'رقم محمول احتياطي معتمد' : 'Approved alternative mobile'}</span>
-                                      )
-                                    ) : (
-                                      <span className="text-rose-500 flex items-center gap-1">⚠️ {currentLang === 'ar' ? 'يرجى إدخال رقم هاتف مصري حقيقي (11 رقم)' : 'Enter 11-digit Egyptian phone'}</span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* MANDATORY HUMAN PHOTO UPLOAD */}
-                            <div className="space-y-2 text-start">
-                              <label className="block text-[10px] font-extrabold uppercase tracking-wider text-brand-blue">
-                                {currentLang === 'ar' ? 'صورة الحساب الشخصي (إجبارية بشرية حقيقية) *' : 'Mandatory Profile Photo (Real Human Face) *'}
-                              </label>
-                              
-                              <div className="border-2 border-dashed border-brand-gold/40 rounded-2xl p-4 text-center hover:border-brand-gold transition-all relative bg-brand-gold/5">
-                                <input 
-                                  type="file" 
-                                  accept="image/*" 
-                                  required
-                                  onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file) return;
-                                    try {
-                                      setRegLoading(true);
-                                      const compressedBase64 = await compressImage(file);
-                                      setRegPicture(compressedBase64);
-                                      setRegError('');
-                                    } catch (err) {
-                                      console.error("Compression error:", err);
-                                      setRegError(currentLang === 'ar' ? 'فشل معالجة الصورة، يرجى المحاولة بصورة أخرى.' : 'Image processing failed.');
-                                    } finally {
-                                      setRegLoading(false);
-                                    }
-                                  }}
-                                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                                />
-                                
-                                {regPicture ? (
-                                  <div className="space-y-2">
-                                    <img 
-                                      src={regPicture} 
-                                      alt="Preview" 
-                                      className="w-20 h-20 rounded-full mx-auto object-cover border-2 border-brand-gold shadow-md"
-                                    />
-                                    <span className="block text-[10px] text-emerald-600 font-bold">✓ تم تجهيز الصورة بنجاح</span>
-                                    <span className="block text-[9px] text-slate-400">{currentLang === 'ar' ? 'انقر أو اسحب لتغيير الصورة' : 'Click or drag to change'}</span>
-                                  </div>
-                                ) : (
-                                  <div className="space-y-1 py-2">
-                                    <span className="text-2xl block">📸</span>
-                                    <span className="block text-xs font-bold text-slate-600">{currentLang === 'ar' ? 'اختر صورة شخصية حقيقية لك' : 'Select a real photo of yourself'}</span>
-                                    <span className="block text-[10px] text-rose-500 font-bold leading-relaxed max-w-xs mx-auto">
-                                      {currentLang === 'ar' 
-                                        ? 'تنبيه: يجب أن تكون الصورة حقيقية لك وبملامح واضحة. الإدارة تقوم بمراجعة جميع الحسابات دورياً وسوف يتم حظر أي حساب يستخدم صورة وهمية أو غير حقيقية فوراً.' 
-                                        : 'Warning: Real profile picture required. Management manually reviews accounts and fake photos will result in an immediate permanent ban.'}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            <button
-                              type="submit"
-                              className="w-full py-4 bg-brand-blue hover:bg-brand-blue/95 text-white font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer transform hover:-translate-y-0.5"
-                            >
-                              <span>👑</span>
-                              <span>{currentLang === 'ar' ? 'إنشاء حساب الزبون وتأكيد الاشتراك' : 'Register & Authorize Account'}</span>
-                            </button>
-                          </form>
-                        </>
-                      ) : (
-                        <>
-                          <div className="text-center space-y-2">
-                            <span className="inline-block p-2 bg-brand-gold/10 rounded-full text-lg">🔑</span>
-                            <h3 className="serif-heading text-xl font-extrabold text-brand-blue">
-                              {currentLang === 'ar' ? 'استعادة بيانات حسابي المسجل' : 'Retrieve My Registered Account'}
-                            </h3>
-                            <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                              {currentLang === 'ar' 
-                                ? 'أدخل معلومات حسابك المسجل مسبقاً لمطابقتها واستعادة حسابك وصورتك المعتمدة بالذكاء الاصطناعي فوراً.' 
-                                : 'Enter your registered email, full name, and phone number to restore your account details instantly.'}
-                            </p>
-                          </div>
-
-                          {regError && (
-                            <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-brand-red leading-relaxed flex items-start gap-2 animate-shake">
-                              <span className="text-sm">⚠️</span>
-                              <div className="text-start">
-                                <span className="font-bold block mb-0.5">{currentLang === 'ar' ? 'فشل التحقق والمطابقة:' : 'Verification Denied:'}</span>
-                                {regError}
-                              </div>
-                            </div>
-                          )}
-
-                          <form
-                            onSubmit={async (e) => {
-                              e.preventDefault();
-                              if (!loginEmail || !loginName || !loginPhone) {
-                                setRegError(currentLang === 'ar' ? 'يرجى إدخال كافة البيانات المطلوبة للمطابقة.' : 'Please enter all required fields.');
-                                return;
-                              }
-                              setRegLoading(true);
-                              setRegError('');
-
-                              try {
-                                const response = await fetch('/api/auth/login-existing-customer', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    email: loginEmail,
-                                    name: loginName,
-                                    phone: loginPhone
-                                  })
-                                });
-
-                                const data = await response.json();
-                                if (response.ok && data.success) {
-                                  setLoginEmail('');
-                                  setLoginName('');
-                                  setLoginPhone('');
-                                  handleLoginSuccess(data.user);
-                                  
-                                  if (data.user.details?.warningMessage) {
-                                    alert(currentLang === 'ar' 
-                                      ? `⚠️ رسالة إدارية هامة / تحذير:\n${data.user.details.warningMessage}` 
-                                      : `⚠️ Administrative Warning:\n${data.user.details.warningMessage}`);
-                                  } else {
-                                    alert(currentLang === 'ar'
-                                      ? `🎉 تم التحقق بنجاح ومطابقة بيانات حسابك! أهلاً بك مجدداً: ${data.user.name}`
-                                      : `🎉 Verified successfully! Welcome back, ${data.user.name}`
-                                    );
-                                  }
-                                } else {
-                                  setRegError(data.error || 'Matching failed');
-                                }
-                              } catch (err) {
-                                console.error(err);
-                                setRegError(currentLang === 'ar' ? 'فشل الاتصال بالخادم لمطابقة البيانات.' : 'Server connection failed.');
-                              } finally {
-                                setRegLoading(false);
-                              }
-                            }}
-                            className="space-y-4 text-start"
-                          >
-                            <div>
-                              <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                                {currentLang === 'ar' ? 'البريد الإلكتروني الجيميل المسجل *' : 'Registered Gmail *'}
-                              </label>
-                              <input
-                                type="email"
-                                required
-                                value={loginEmail}
-                                onChange={(e) => setLoginEmail(e.target.value)}
-                                placeholder="name@example.com"
-                                className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm font-mono"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                                {currentLang === 'ar' ? 'الاسم بالكامل المسجل *' : 'Registered Full Name *'}
-                              </label>
-                              <input
-                                type="text"
-                                required
-                                value={loginName}
-                                onChange={(e) => setLoginName(e.target.value)}
-                                placeholder={currentLang === 'ar' ? 'مثال: أحمد محمد علي' : 'e.g. Ahmad Mohamed Ali'}
-                                className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                                {currentLang === 'ar' ? 'رقم الهاتف المسجل *' : 'Registered Phone Number *'}
-                              </label>
-                              <input
-                                type="tel"
-                                required
-                                value={loginPhone}
-                                onChange={(e) => setLoginPhone(e.target.value)}
-                                placeholder="01xxxxxxxxx"
-                                className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm font-mono"
-                              />
-                              {loginPhone && (
-                                <div className="mt-1 text-[9px] font-bold">
-                                  {checkEgyptianPhone(loginPhone) ? (
-                                    <span className="text-emerald-600 flex items-center gap-1">✓ {currentLang === 'ar' ? 'رقم محمول مصري معتمد' : 'Approved Egyptian mobile'}</span>
-                                  ) : (
-                                    <span className="text-rose-500 flex items-center gap-1">⚠️ {currentLang === 'ar' ? 'يرجى إدخال رقم هاتف مصري حقيقي (11 رقم)' : 'Enter 11-digit Egyptian phone'}</span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            <button
-                              type="submit"
-                              className="w-full py-4 bg-brand-blue hover:bg-brand-blue/95 text-white font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer transform hover:-translate-y-0.5"
-                            >
-                              <span>🔑</span>
-                              <span>{currentLang === 'ar' ? 'المطابقة واستعادة الحساب فوراً' : 'Verify & Retrieve Account'}</span>
-                            </button>
-                          </form>
-                        </>
+                        </div>
                       )}
+
+                      <div className="pt-4">
+                        <button
+                          onClick={async () => {
+                            setRegLoading(true);
+                            setRegError('');
+                            try {
+                              const { auth, googleProvider } = await import('./lib/firebase');
+                              const { signInWithPopup } = await import('firebase/auth');
+                              const result = await signInWithPopup(auth, googleProvider);
+                              const user = result.user;
+                              
+                              if (!user.email) throw new Error("No email found");
+                              
+                              // Check backend if needed, or just login
+                              try {
+                                const res = await fetch("/api/auth/firebase-login", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    email: user.email,
+                                    name: user.displayName || user.email.split("@")[0],
+                                    picture: user.photoURL || ""
+                                  })
+                                });
+                                if (res.ok) {
+                                  const text = await res.text();
+                                  let dbUser = JSON.parse(text);
+                                  handleLoginSuccess(dbUser);
+                                } else {
+                                   handleLoginSuccess({
+                                      email: user.email,
+                                      name: user.displayName || user.email.split("@")[0],
+                                      picture: user.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`,
+                                      role: "Customer"
+                                    });
+                                }
+                              } catch (e) {
+                                handleLoginSuccess({
+                                  email: user.email,
+                                  name: user.displayName || user.email.split("@")[0],
+                                  picture: user.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`,
+                                  role: "Customer"
+                                });
+                              }
+                            } catch (err: any) {
+                              console.error(err);
+                              setRegError(err.message || 'Authentication failed');
+                            } finally {
+                              setRegLoading(false);
+                            }
+                          }}
+                          disabled={regLoading}
+                          className="w-full py-4 px-6 bg-white border-2 border-slate-200 hover:border-brand-gold hover:bg-slate-50 text-slate-700 font-black rounded-2xl text-sm flex items-center justify-center gap-3 shadow-sm transition-all transform hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {regLoading ? (
+                            <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                              <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.578-7.859-8s3.53-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l3.245-3.13C18.28 1.83 15.54.96 12.24.96 6.136.96 1.16 5.916 1.16 12s4.975 11.04 11.08 11.04c6.38 0 10.614-4.484 10.614-10.8 0-.727-.08-1.282-.175-1.955H12.24z"/>
+                            </svg>
+                          )}
+                          <span>{currentLang === 'ar' ? 'المتابعة بحساب جوجل' : 'Continue with Google'}</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
