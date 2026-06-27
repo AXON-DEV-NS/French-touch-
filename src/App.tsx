@@ -84,6 +84,9 @@ const safeSessionStorage = {
 
 import { compressImage } from './utils/imageCompressor';
 
+import { auth, googleProvider } from './lib/firebase';
+import { signInWithPopup } from 'firebase/auth';
+
 export default function App() {
   // --- Landing Screen Entry State ---
   const [entered, setEntered] = useState(() => {
@@ -2080,8 +2083,7 @@ ${itemsList}
                             setRegLoading(true);
                             setRegError('');
                             try {
-                              const { auth, googleProvider } = await import('./lib/firebase');
-                              const { signInWithPopup } = await import('firebase/auth');
+                              console.log('AUTH OBJECT:', auth);
                               const result = await signInWithPopup(auth, googleProvider);
                               const user = result.user;
                               
