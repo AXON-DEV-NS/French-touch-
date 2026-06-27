@@ -621,131 +621,136 @@ function isEgyptianPhone(phone: string): boolean {
 }
 
 app.post("/api/auth/register-customer", async (req, res) => {
-  const { firstName, secondName, thirdName, phone, alternativePhone, email, picture } = req.body;
-  if (!firstName || !secondName || !thirdName || !phone || !alternativePhone || !email || !picture) {
-    return res.status(400).json({ error: "جميع الحقول مطلوبة إجبارياً، بما في ذلك الاسم الثلاثي، الهواتف، البريد وصورة الحساب." });
-  }
-
-  // Enforce Egyptian Mobile Number Verification
-  if (!isEgyptianPhone(phone)) {
-    return res.status(400).json({ 
-      error: "رقم الهاتف الأساسي غير صحيح! يجب إدخال رقم هاتف محمول مصري حقيقي نشط (مكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015)." 
-    });
-  }
-  if (!isEgyptianPhone(alternativePhone)) {
-    return res.status(400).json({ 
-      error: "رقم الهاتف الاحتياطي غير صحيح! يجب إدخال رقم هاتف محمول مصري حقيقي احتياطي مختلف (مكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015)." 
-    });
-  }
-  if (phone.replace(/\D/g, "") === alternativePhone.replace(/\D/g, "")) {
-    return res.status(400).json({ 
-      error: "رقم الهاتف الاحتياطي يجب أن يكون مختلفاً تماماً عن رقم الهاتف الأساسي لتسهيل التواصل والتحقق الفوري." 
-    });
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-  const db = await readDb();
-
-  // 1. Check strict programmatic blocking first
-  const blocked = db.blockedCustomers || [];
-  const cleanNewPhone = cleanPhone(phone);
-  const cleanNewAltPhone = cleanPhone(alternativePhone);
-  const normNewName = normalizeArabic(`${firstName} ${secondName} ${thirdName}`);
-
-  for (const b of blocked) {
-    const bEmail = b.email.trim().toLowerCase();
-    const bPhone = cleanPhone(b.phone);
-    const bAlt = cleanPhone(b.alternativePhone);
-    const normBName = normalizeArabic(`${b.firstName} ${b.secondName} ${b.thirdName}`);
-
-    if (cleanEmail === bEmail) {
-      return res.status(400).json({ error: "تم حظر هذا البريد الإلكتروني نهائياً من قبل الإدارة لمخالفته القوانين." });
+  try {
+    const { firstName, secondName, thirdName, phone, alternativePhone, email, picture } = req.body;
+    if (!firstName || !secondName || !thirdName || !phone || !alternativePhone || !email || !picture) {
+      return res.status(400).json({ error: "جميع الحقول مطلوبة إجبارياً، بما في ذلك الاسم الثلاثي، الهواتف، البريد وصورة الحساب." });
     }
-    if (cleanNewPhone === bPhone || cleanNewPhone === bAlt || (cleanNewAltPhone && (cleanNewAltPhone === bPhone || cleanNewAltPhone === bAlt))) {
-      return res.status(400).json({ error: "رقم الهاتف المدخل (أو الاحتياطي) مرتبط بحساب تم حظره نهائياً." });
+
+    // Enforce Egyptian Mobile Number Verification
+    if (!isEgyptianPhone(phone)) {
+      return res.status(400).json({ 
+        error: "رقم الهاتف الأساسي غير صحيح! يجب إدخال رقم هاتف محمول مصري حقيقي نشط (مكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015)." 
+      });
     }
-    if (normNewName === normBName) {
-      return res.status(400).json({ error: "الاسم الثلاثي المدخل متطابق مع اسم مستخدم تم حظره نهائياً من النظام." });
+    if (!isEgyptianPhone(alternativePhone)) {
+      return res.status(400).json({ 
+        error: "رقم الهاتف الاحتياطي غير صحيح! يجب إدخال رقم هاتف محمول مصري حقيقي احتياطي مختلف (مكون من 11 رقماً ويبدأ بـ 010 أو 011 أو 012 أو 015)." 
+      });
     }
-    if (picture === b.picture) {
-      return res.status(400).json({ error: "الصورة المرفوعة مخصصة لحساب محظور مسبقاً." });
+    if (phone.replace(/\D/g, "") === alternativePhone.replace(/\D/g, "")) {
+      return res.status(400).json({ 
+        error: "رقم الهاتف الاحتياطي يجب أن يكون مختلفاً تماماً عن رقم الهاتف الأساسي لتسهيل التواصل والتحقق الفوري." 
+      });
     }
-  }
 
-  // Check if already registered
-  const exists = (db.registeredCustomers || []).some(c => c.email.toLowerCase() === cleanEmail);
-  if (exists) {
-    return res.status(400).json({ error: "هذا البريد الإلكتروني مسجل بالفعل." });
-  }
+    const cleanEmail = email.trim().toLowerCase();
+    const db = await readDb();
 
-  // Add customer directly to DB
-  const newCustomer: RegisteredCustomer = {
-    firstName: firstName.trim(),
-    secondName: secondName.trim(),
-    thirdName: thirdName.trim(),
-    phone: phone.trim(),
-    alternativePhone: alternativePhone.trim(),
-    email: cleanEmail,
-    picture: picture,
-    registeredAt: new Date().toISOString()
-  };
+    // 1. Check strict programmatic blocking first
+    const blocked = db.blockedCustomers || [];
+    const cleanNewPhone = cleanPhone(phone);
+    const cleanNewAltPhone = cleanPhone(alternativePhone);
+    const normNewName = normalizeArabic(`${firstName} ${secondName} ${thirdName}`);
 
-  if (!db.registeredCustomers) db.registeredCustomers = [];
-  db.registeredCustomers.unshift(newCustomer);
+    for (const b of blocked) {
+      const bEmail = (b.email || "").trim().toLowerCase();
+      const bPhone = b.phone ? cleanPhone(b.phone) : "";
+      const bAlt = b.alternativePhone ? cleanPhone(b.alternativePhone) : "";
+      const normBName = normalizeArabic(`${b.firstName || ""} ${b.secondName || ""} ${b.thirdName || ""}`);
 
-  if (!db.subscribers) db.subscribers = [];
-  if (!db.subscribers.includes(cleanEmail)) {
-    db.subscribers.push(cleanEmail);
-  }
+      if (cleanEmail === bEmail) {
+        return res.status(400).json({ error: "تم حظر هذا البريد الإلكتروني نهائياً من قبل الإدارة لمخالفته القوانين." });
+      }
+      if (cleanNewPhone === bPhone || cleanNewPhone === bAlt || (cleanNewAltPhone && (cleanNewAltPhone === bPhone || cleanNewAltPhone === bAlt))) {
+        return res.status(400).json({ error: "رقم الهاتف المدخل (أو الاحتياطي) مرتبط بحساب تم حظره نهائياً." });
+      }
+      if (normNewName === normBName) {
+        return res.status(400).json({ error: "الاسم الثلاثي المدخل متطابق مع اسم مستخدم تم حظره نهائياً من النظام." });
+      }
+      if (b.picture && picture === b.picture) {
+        return res.status(400).json({ error: "الصورة المرفوعة مخصصة لحساب محظور مسبقاً." });
+      }
+    }
 
-  const fullName = `${newCustomer.firstName} ${newCustomer.secondName} ${newCustomer.thirdName}`;
-  const newVisitor: Visitor = {
-    email: cleanEmail,
-    name: fullName,
-    picture: newCustomer.picture,
-    timestamp: new Date().toISOString(),
-    ip: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1",
-    userAgent: req.headers["user-agent"] || "Customer Registration Flow",
-    authType: "sandbox",
-    role: "Customer"
-  };
-  db.visitors.unshift(newVisitor);
+    // Check if already registered
+    const exists = (db.registeredCustomers || []).some(c => c.email.toLowerCase() === cleanEmail);
+    if (exists) {
+      return res.status(400).json({ error: "هذا البريد الإلكتروني مسجل بالفعل." });
+    }
 
-  const emailLog: EmailLogObj = {
-    toEmail: cleanEmail,
-    subject: "🎁 أهلاً بك في فرنش تاتش! عروضنا الحصرية والمنتجات الجديدة بانتظارك",
-    body: `مرحباً ${newCustomer.firstName}،
-تم تسجيل حسابك بنجاح في تطبيق مطعم فرنش تاتش (French Touch)!
-
-إليك أحدث العروض والمنتجات الحصرية المتوفرة لدينا الآن:
-1. بطاطس فرنش تاتش اللذيذة بالجبنة والأعشاب البرية.
-2. السندوتشات الفاخرة مثل سندوتش كروك موسيو الكلاسيكي.
-3. الحلويات الفرنسية الفاخرة المجهزة يومياً.
-
-خصم ترحيبي خاص 20% على طلبك القادم! كود الخصم: WELCOME20
-
-تم إرسال هذه النشرة تلقائياً وإجبارياً لبريدك الإلكتروني المسجل لدينا: ${cleanEmail}.
-أهلاً بك في عائلتنا المميزة!`,
-    sentAt: new Date().toISOString(),
-    status: "DELIVERED"
-  };
-
-  if (!db.emailLogs) db.emailLogs = [];
-  db.emailLogs.unshift(emailLog);
-
-  await writeDb(db);
-
-  res.json({
-    success: true,
-    user: {
+    // Add customer directly to DB
+    const newCustomer: RegisteredCustomer = {
+      firstName: firstName.trim(),
+      secondName: secondName.trim(),
+      thirdName: thirdName.trim(),
+      phone: phone.trim(),
+      alternativePhone: alternativePhone.trim(),
       email: cleanEmail,
-      name: `${newCustomer.firstName} ${newCustomer.secondName}`,
-      role: "Customer",
-      picture: newCustomer.picture,
-      lang: "ar",
-      details: newCustomer
+      picture: picture,
+      registeredAt: new Date().toISOString()
+    };
+
+    if (!db.registeredCustomers) db.registeredCustomers = [];
+    db.registeredCustomers.unshift(newCustomer);
+
+    if (!db.subscribers) db.subscribers = [];
+    if (!db.subscribers.includes(cleanEmail)) {
+      db.subscribers.push(cleanEmail);
     }
-  });
+
+    const fullName = `${newCustomer.firstName} ${newCustomer.secondName} ${newCustomer.thirdName}`;
+    const newVisitor: Visitor = {
+      email: cleanEmail,
+      name: fullName,
+      picture: newCustomer.picture,
+      timestamp: new Date().toISOString(),
+      ip: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1",
+      userAgent: req.headers["user-agent"] || "Customer Registration Flow",
+      authType: "sandbox",
+      role: "Customer"
+    };
+    db.visitors.unshift(newVisitor);
+
+    const emailLog: EmailLogObj = {
+      toEmail: cleanEmail,
+      subject: "🎁 أهلاً بك في فرنش تاتش! عروضنا الحصرية والمنتجات الجديدة بانتظارك",
+      body: `مرحباً ${newCustomer.firstName}،
+  تم تسجيل حسابك بنجاح في تطبيق مطعم فرنش تاتش (French Touch)!
+  
+  إليك أحدث العروض والمنتجات الحصرية المتوفرة لدينا الآن:
+  1. بطاطس فرنش تاتش اللذيذة بالجبنة والأعشاب البرية.
+  2. السندوتشات الفاخرة مثل سندوتش كروك موسيو الكلاسيكي.
+  3. الحلويات الفرنسية الفاخرة المجهزة يومياً.
+  
+  خصم ترحيبي خاص 20% على طلبك القادم! كود الخصم: WELCOME20
+  
+  تم إرسال هذه النشرة تلقائياً وإجبارياً لبريدك الإلكتروني المسجل لدينا: ${cleanEmail}.
+  أهلاً بك في عائلتنا المميزة!`,
+      sentAt: new Date().toISOString(),
+      status: "DELIVERED"
+    };
+
+    if (!db.emailLogs) db.emailLogs = [];
+    db.emailLogs.unshift(emailLog);
+
+    await writeDb(db);
+
+    res.json({
+      success: true,
+      user: {
+        email: cleanEmail,
+        name: `${newCustomer.firstName} ${newCustomer.secondName}`,
+        role: "Customer",
+        picture: newCustomer.picture,
+        lang: "ar",
+        details: newCustomer
+      }
+    });
+  } catch (err: any) {
+    console.error("Register Customer Error:", err);
+    res.status(500).json({ error: "حدث خطأ غير متوقع أثناء تسجيل الحساب: " + err.message });
+  }
 });
 
 

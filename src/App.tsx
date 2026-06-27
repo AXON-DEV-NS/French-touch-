@@ -2202,7 +2202,7 @@ ${itemsList}
                                   value={regFirstName}
                                   onChange={(e) => setRegFirstName(e.target.value)}
                                   placeholder={currentLang === 'ar' ? 'مثال: أحمد' : 'e.g. Ahmad'}
-                                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                                  className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm"
                                 />
                               </div>
                               <div>
@@ -2215,7 +2215,7 @@ ${itemsList}
                                   value={regSecondName}
                                   onChange={(e) => setRegSecondName(e.target.value)}
                                   placeholder={currentLang === 'ar' ? 'مثال: محمد' : 'e.g. Mohamed'}
-                                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                                  className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm"
                                 />
                               </div>
                               <div>
@@ -2228,7 +2228,7 @@ ${itemsList}
                                   value={regThirdName}
                                   onChange={(e) => setRegThirdName(e.target.value)}
                                   placeholder={currentLang === 'ar' ? 'مثال: علي' : 'e.g. Ali'}
-                                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                                  className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm"
                                 />
                               </div>
                             </div>
@@ -2244,7 +2244,7 @@ ${itemsList}
                                 value={regEmail}
                                 onChange={(e) => setRegEmail(e.target.value)}
                                 placeholder="example@gmail.com"
-                                className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                                className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm font-mono"
                               />
                             </div>
 
@@ -2285,7 +2285,7 @@ ${itemsList}
                                   value={regPhone}
                                   onChange={(e) => setRegPhone(e.target.value)}
                                   placeholder="01xxxxxxxxx"
-                                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                                  className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm font-mono"
                                 />
                                 {regPhone && (
                                   <div className="mt-1 text-[9px] font-bold">
@@ -2307,7 +2307,7 @@ ${itemsList}
                                   value={regAltPhone}
                                   onChange={(e) => setRegAltPhone(e.target.value)}
                                   placeholder="01xxxxxxxxx"
-                                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                                  className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm font-mono"
                                 />
                                 {regAltPhone && (
                                   <div className="mt-1 text-[9px] font-bold">
@@ -2331,7 +2331,7 @@ ${itemsList}
                                 {currentLang === 'ar' ? 'صورة الحساب الشخصي (إجبارية بشرية حقيقية) *' : 'Mandatory Profile Photo (Real Human Face) *'}
                               </label>
                               
-                              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-brand-gold transition-all relative bg-slate-50/50">
+                              <div className="border-2 border-dashed border-brand-gold/40 rounded-2xl p-4 text-center hover:border-brand-gold transition-all relative bg-brand-gold/5">
                                 <input 
                                   type="file" 
                                   accept="image/*" 
@@ -2471,7 +2471,7 @@ ${itemsList}
                                 value={loginEmail}
                                 onChange={(e) => setLoginEmail(e.target.value)}
                                 placeholder="name@example.com"
-                                className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                                className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm font-mono"
                               />
                             </div>
 
@@ -2485,7 +2485,7 @@ ${itemsList}
                                 value={loginName}
                                 onChange={(e) => setLoginName(e.target.value)}
                                 placeholder={currentLang === 'ar' ? 'مثال: أحمد محمد علي' : 'e.g. Ahmad Mohamed Ali'}
-                                className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue"
+                                className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm"
                               />
                             </div>
 
@@ -2499,7 +2499,7 @@ ${itemsList}
                                 value={loginPhone}
                                 onChange={(e) => setLoginPhone(e.target.value)}
                                 placeholder="01xxxxxxxxx"
-                                className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-xs focus:outline-none focus:border-brand-blue font-mono"
+                                className="w-full px-3.5 py-3 bg-white border border-brand-gold/30 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold focus:border-brand-gold shadow-sm font-mono"
                               />
                               {loginPhone && (
                                 <div className="mt-1 text-[9px] font-bold">
