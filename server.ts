@@ -497,44 +497,54 @@ app.get("/api/managers", requireDeveloper, async (req, res) => {
 });
 
 app.post("/api/managers", requireDeveloper, async (req, res) => {
-  const { email, name, password, lang } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: "Email is required" });
+  try {
+    const { email, name, password, lang } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name?.trim() || cleanEmail.split("@")[0];
+    const cleanPassword = password?.trim() || "123";
+    const cleanLang = lang || "ar";
+    const db = await readDb();
+
+    if (!db.managers) db.managers = [];
+    
+    if (db.managers.some(m => m.email.toLowerCase() === cleanEmail)) {
+      return res.status(400).json({ error: "Email is already authorized as a manager" });
+    }
+
+    const newManager = {
+      email: cleanEmail,
+      name: cleanName,
+      password: cleanPassword,
+      lang: cleanLang,
+      addedAt: new Date().toISOString()
+    };
+
+    db.managers.push(newManager);
+    await writeDb(db);
+    res.json({ success: true, managers: db.managers });
+  } catch (err: any) {
+    console.error("Add manager error:", err);
+    res.status(500).json({ error: "Server error: " + err.message });
   }
-
-  const cleanEmail = email.trim().toLowerCase();
-  const cleanName = name?.trim() || cleanEmail.split("@")[0];
-  const cleanPassword = password?.trim() || "123";
-  const cleanLang = lang || "ar";
-  const db = await readDb();
-
-  if (!db.managers) db.managers = [];
-  
-  if (db.managers.some(m => m.email.toLowerCase() === cleanEmail)) {
-    return res.status(400).json({ error: "Email is already authorized as a manager" });
-  }
-
-  const newManager = {
-    email: cleanEmail,
-    name: cleanName,
-    password: cleanPassword,
-    lang: cleanLang,
-    addedAt: new Date().toISOString()
-  };
-
-  db.managers.push(newManager);
-  await writeDb(db);
-  res.json({ success: true, managers: db.managers });
 });
 
 app.delete("/api/managers/:email", requireDeveloper, async (req, res) => {
-  const emailToRemove = req.params.email.trim().toLowerCase();
-  const db = await readDb();
+  try {
+    const emailToRemove = req.params.email.trim().toLowerCase();
+    const db = await readDb();
 
-  if (!db.managers) db.managers = [];
-  db.managers = db.managers.filter(m => m.email.toLowerCase() !== emailToRemove);
-  await writeDb(db);
-  res.json({ success: true, managers: db.managers });
+    if (!db.managers) db.managers = [];
+    db.managers = db.managers.filter(m => m.email.toLowerCase() !== emailToRemove);
+    await writeDb(db);
+    res.json({ success: true, managers: db.managers });
+  } catch (err: any) {
+    console.error("Delete manager error:", err);
+    res.status(500).json({ error: "Server error: " + err.message });
+  }
 });
 
 // 4.5 Manager Password Login Gate

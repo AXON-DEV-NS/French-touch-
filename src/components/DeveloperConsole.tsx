@@ -260,7 +260,14 @@ export default function DeveloperConsole({
         body: JSON.stringify({ email, name, password, lang: newManagerLang })
       });
 
-      const data = await res.json();
+      let data;
+      const text = await res.text();
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        throw new Error(`Server returned invalid response: ${text.substring(0, 50)}`);
+      }
+
       if (!res.ok) {
         throw new Error(data.error || "Failed to add manager");
       }

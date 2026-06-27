@@ -240,7 +240,11 @@ export default function App() {
   const [isCheckoutDetailsOpen, setIsCheckoutDetailsOpen] = useState(false);
   const [checkoutBranch, setCheckoutBranch] = useState<'medical' | 'waha'>('medical');
   const [checkoutDiningType, setCheckoutDiningType] = useState<'takeaway' | 'dinein'>('takeaway');
-  const [checkoutDate, setCheckoutDate] = useState('');
+  const [checkoutDate, setCheckoutDate] = useState(() => {
+    const today = new Date();
+    // Use local date instead of UTC to avoid time zone offset issues
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  });
   const [checkoutTime, setCheckoutTime] = useState('');
   const [checkoutRulesAccepted, setCheckoutRulesAccepted] = useState(false);
   const [currentOrderNumber, setCurrentOrderNumber] = useState<number | null>(null);
@@ -934,8 +938,8 @@ export default function App() {
   };
 
   const handleFinalizeOrderWhatsApp = () => {
-    if (!checkoutDate || !checkoutTime) {
-      alert(currentLang === 'ar' ? 'الرجاء اختيار تاريخ ووقت استلاف الطلب أولاً!' : 'Please choose a date and time to collect your gourmet order first!');
+    if (!checkoutTime) {
+      alert(currentLang === 'ar' ? 'الرجاء اختيار وقت استلام الطلب أولاً!' : 'Please choose a time to collect your gourmet order first!');
       return;
     }
     if (!checkoutRulesAccepted) {
@@ -1727,19 +1731,23 @@ ${itemsList}
 
             {/* OFFERS VIEW */}
             {activeAppTab === 'offers' && (
-              <div className="space-y-8">
+              <div className="space-y-12">
                 <div>
                   <h2 className="serif-heading text-2xl md:text-3xl font-extrabold text-brand-blue">
                     {t.offers}
                   </h2>
                   <p className="text-gray-500 text-xs mt-1">
-                    {t.exclusiveBannerTitle}
+                    {currentLang === 'ar' ? 'استكشف عروضنا المميزة والمقسمة لتلبي كافة تطلعاتك الذواقة.' : 'Explore our exclusive and weekly gourmet specials.'}
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-stretch">
-                  {/* Exclusive Countdown Banner */}
-                  <div className="xl:col-span-8 flex flex-col">
+                <div className="space-y-10">
+                  {/* Section 1: Exclusive Offers */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-black text-brand-blue flex items-center gap-2">
+                      <span className="text-brand-gold">🌟</span>
+                      {currentLang === 'ar' ? 'قسم العروض الحصرية' : 'Exclusive Offers'}
+                    </h3>
                     <ExclusiveOfferBanner
                       offer={exclusiveOffer}
                       currentLang={currentLang}
@@ -1752,36 +1760,42 @@ ${itemsList}
                     />
                   </div>
 
-                  {/* Today's Weekly Offer */}
-                  <div className="xl:col-span-4 bg-brand-gold/10 border border-brand-gold/20 p-8 rounded-3xl flex flex-col justify-between relative overflow-hidden">
-                    <div className="space-y-4">
-                      <span className="inline-flex items-center gap-1.5 bg-brand-blue text-brand-cream font-bold px-3 py-1 rounded-full text-[10px] uppercase tracking-wider">
-                        <Calendar className="w-3 h-3 text-brand-gold" />
-                        {t.todayRecurringOffer}
-                      </span>
+                  {/* Section 2: Weekly Offers */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-black text-brand-blue flex items-center gap-2">
+                      <span className="text-brand-gold">📅</span>
+                      {currentLang === 'ar' ? 'قسم العروض الأسبوعية (يوم واحد كل أسبوع)' : 'Weekly Offers (One Day Per Week)'}
+                    </h3>
+                    <div className="bg-brand-gold/5 border border-brand-gold/20 p-8 rounded-3xl flex flex-col relative overflow-hidden">
+                      <div className="space-y-4">
+                        <span className="inline-flex items-center gap-1.5 bg-brand-blue text-brand-cream font-bold px-3 py-1 rounded-full text-[10px] uppercase tracking-wider w-fit">
+                          <Calendar className="w-3 h-3 text-brand-gold" />
+                          {t.todayRecurringOffer}
+                        </span>
 
-                      {todaysWeeklyOffer && todaysWeeklyOffer.active ? (
-                        <div className="space-y-3">
-                          <h3 className="serif-heading text-2xl font-black text-brand-blue">
-                            {todaysWeeklyOffer.title[currentLang] || todaysWeeklyOffer.title.en}
-                          </h3>
-                          <div className="text-xs font-bold text-brand-red font-mono uppercase bg-white px-3 py-1.5 rounded-lg inline-block border border-brand-red/10">
-                            🎁 DISCOUNT: {todaysWeeklyOffer.discount}
+                        {todaysWeeklyOffer && todaysWeeklyOffer.active ? (
+                          <div className="space-y-3">
+                            <h3 className="serif-heading text-2xl font-black text-brand-blue">
+                              {todaysWeeklyOffer.title[currentLang] || todaysWeeklyOffer.title.en}
+                            </h3>
+                            <div className="text-xs font-bold text-brand-red font-mono uppercase bg-white px-3 py-1.5 rounded-lg inline-block border border-brand-red/10">
+                              🎁 DISCOUNT: {todaysWeeklyOffer.discount}
+                            </div>
+                            <p className="text-gray-600 text-xs leading-relaxed max-w-2xl">
+                              {todaysWeeklyOffer.description[currentLang] || todaysWeeklyOffer.description.en}
+                            </p>
                           </div>
-                          <p className="text-gray-600 text-xs leading-relaxed">
-                            {todaysWeeklyOffer.description[currentLang] || todaysWeeklyOffer.description.en}
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 text-xs">{t.noOfferToday}</p>
-                      )}
-                    </div>
+                        ) : (
+                          <p className="text-gray-500 text-xs">{t.noOfferToday}</p>
+                        )}
+                      </div>
 
-                    <div className="pt-6 mt-6 border-t border-brand-gold/20 flex items-center justify-between text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                      <span>{t.weeklyOffer}</span>
-                      <span className="text-brand-blue font-mono">
-                        {t.weeklyRecurringDay.replace('{day}', t.days[currentDayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6])}
-                      </span>
+                      <div className="pt-6 mt-6 border-t border-brand-gold/20 flex items-center justify-between text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                        <span>{t.weeklyOffer}</span>
+                        <span className="text-brand-blue font-mono bg-brand-blue/5 px-2 py-1 rounded-md">
+                          {t.weeklyRecurringDay.replace('{day}', t.days[currentDayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6])}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2536,7 +2550,7 @@ ${itemsList}
         <div className="fixed inset-0 z-50 overflow-hidden" id="gourmet-bag-drawer">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setIsCartOpen(false)}></div>
           
-          <div className={`absolute inset-y-0 ${currentLangDir === 'rtl' ? 'left-0' : 'right-0'} max-w-md w-full bg-white shadow-2xl p-6 flex flex-col justify-between border-l border-slate-100 z-50 animate-in slide-in-from-${currentLangDir === 'rtl' ? 'left' : 'right'} duration-300`}>
+          <div className={`absolute inset-y-0 ${currentLangDir === 'rtl' ? 'left-0' : 'right-0'} max-w-md w-full bg-[#fbf8f5] shadow-2xl p-6 flex flex-col justify-between border-l border-brand-gold/10 z-50 animate-in slide-in-from-${currentLangDir === 'rtl' ? 'left' : 'right'} duration-300`}>
             
             <div className="space-y-6 flex-grow overflow-y-auto">
               {/* Drawer Title Header */}
@@ -2635,11 +2649,11 @@ ${itemsList}
                   </div>
 
                   {/* Collapsible/Compact items list summary */}
-                  <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-2xl">
+                  <div className="bg-white border border-brand-gold/20 shadow-sm p-3 rounded-2xl">
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono mb-2">
                       {currentLang === 'ar' ? 'ملخص مأكولات الطلب الفاخر' : 'Your Gourmet Tray Summary'}
                     </div>
-                    <div className="max-h-24 overflow-y-auto space-y-1.5 divide-y divide-slate-200/40 text-[11px]">
+                    <div className="max-h-24 overflow-y-auto space-y-1.5 divide-y divide-slate-100 text-[11px]">
                       {cart.map((item) => (
                         <div key={item.id} className="pt-1.5 flex justify-between text-brand-blue font-bold">
                           <span>{item.product.name[currentLang] || item.product.name.en} <span className="font-mono text-slate-400 font-normal">x{item.quantity}</span></span>
@@ -2661,7 +2675,7 @@ ${itemsList}
                         className={`p-3 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
                           checkoutBranch === 'medical'
                             ? 'bg-brand-blue/5 border-brand-blue text-brand-blue ring-1 ring-brand-blue'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            : 'border-brand-gold/20 bg-white text-slate-500 shadow-sm hover:bg-brand-gold/5'
                         }`}
                       >
                         <div className="text-base mb-1">🏥</div>
@@ -2675,7 +2689,7 @@ ${itemsList}
                         className={`p-3 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
                           checkoutBranch === 'waha'
                             ? 'bg-brand-blue/5 border-brand-blue text-brand-blue ring-1 ring-brand-blue'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            : 'border-brand-gold/20 bg-white text-slate-500 shadow-sm hover:bg-brand-gold/5'
                         }`}
                       >
                         <div className="text-base mb-1">🌳</div>
@@ -2697,7 +2711,7 @@ ${itemsList}
                         className={`p-3 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
                           checkoutDiningType === 'takeaway'
                             ? 'bg-brand-blue/5 border-brand-blue text-brand-blue ring-1 ring-brand-blue'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            : 'border-brand-gold/20 bg-white text-slate-500 shadow-sm hover:bg-brand-gold/5'
                         }`}
                       >
                         <span className="block text-base mb-1">🛍️</span>
@@ -2710,7 +2724,7 @@ ${itemsList}
                         className={`p-3 rounded-xl border text-xs font-bold text-center transition-all cursor-pointer ${
                           checkoutDiningType === 'dinein'
                             ? 'bg-brand-blue/5 border-brand-blue text-brand-blue ring-1 ring-brand-blue'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            : 'border-brand-gold/20 bg-white text-slate-500 shadow-sm hover:bg-brand-gold/5'
                         }`}
                       >
                         <span className="block text-base mb-1">🍽️</span>
@@ -2723,15 +2737,11 @@ ${itemsList}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
-                        {currentLang === 'ar' ? 'تاريخ الاستلام *' : 'Pickup Date *'}
+                        {currentLang === 'ar' ? 'تاريخ الاستلام (اليوم) *' : 'Pickup Date (Today) *'}
                       </label>
-                      <input
-                        type="date"
-                        required
-                        value={checkoutDate}
-                        onChange={(e) => setCheckoutDate(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-brand-blue"
-                      />
+                      <div className="w-full px-3 py-2.5 bg-brand-gold/10 border border-brand-gold/20 rounded-xl text-xs font-mono font-bold text-brand-blue flex items-center h-[38px]">
+                        {checkoutDate}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-wider text-brand-blue mb-1">
@@ -2742,7 +2752,7 @@ ${itemsList}
                         required
                         value={checkoutTime}
                         onChange={(e) => setCheckoutTime(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-brand-blue"
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue h-[38px] shadow-sm"
                       />
                     </div>
                   </div>
@@ -2878,7 +2888,7 @@ ${itemsList}
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => setIsCheckoutDetailsOpen(false)}
-                      className="py-3.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-2xl text-xs transition-colors cursor-pointer text-center"
+                      className="py-3.5 border border-brand-gold/30 bg-white hover:bg-brand-gold/5 text-brand-blue font-bold rounded-2xl text-xs transition-colors cursor-pointer text-center shadow-sm"
                     >
                       {currentLang === 'ar' ? 'تعديل السلة' : 'Edit Tray'}
                     </button>
