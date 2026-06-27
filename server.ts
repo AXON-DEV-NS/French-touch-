@@ -180,12 +180,7 @@ async function readDb(): Promise<DbSchema> {
     if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
       const data = await kv.get<DbSchema>("frenchtouch_db");
       if (data) {
-        // ensure missing properties
-        if (data.orderCounter === undefined) data.orderCounter = 0;
-        if (data.pageViews === undefined) data.pageViews = 0;
-        if (data.blockedCustomers === undefined) data.blockedCustomers = [];
-        if (data.reviews === undefined) data.reviews = [];
-        return data;
+        return { ...initialDb, ...data };
       }
       return initialDb;
     }
@@ -197,12 +192,7 @@ async function readDb(): Promise<DbSchema> {
     const content = fs.readFileSync(DB_FILE, "utf-8");
     const parsed = JSON.parse(content);
     
-    if (parsed.orderCounter === undefined) parsed.orderCounter = 0;
-    if (parsed.pageViews === undefined) parsed.pageViews = 0;
-    if (parsed.blockedCustomers === undefined) parsed.blockedCustomers = [];
-    if (parsed.reviews === undefined) parsed.reviews = [];
-    
-    return parsed;
+    return { ...initialDb, ...parsed };
   } catch (error) {
     console.error("Error reading database:", error);
     return initialDb;
@@ -503,7 +493,7 @@ app.post("/api/auth/firebase-login", async (req, res) => {
 // 4. Managers Endpoints
 app.get("/api/managers", requireDeveloper, async (req, res) => {
   const db = await readDb();
-  res.json(db.managers);
+  res.json(db.managers || []);
 });
 
 app.post("/api/managers", requireDeveloper, async (req, res) => {
@@ -518,6 +508,8 @@ app.post("/api/managers", requireDeveloper, async (req, res) => {
   const cleanLang = lang || "ar";
   const db = await readDb();
 
+  if (!db.managers) db.managers = [];
+  
   if (db.managers.some(m => m.email.toLowerCase() === cleanEmail)) {
     return res.status(400).json({ error: "Email is already authorized as a manager" });
   }
@@ -539,6 +531,7 @@ app.delete("/api/managers/:email", requireDeveloper, async (req, res) => {
   const emailToRemove = req.params.email.trim().toLowerCase();
   const db = await readDb();
 
+  if (!db.managers) db.managers = [];
   db.managers = db.managers.filter(m => m.email.toLowerCase() !== emailToRemove);
   await writeDb(db);
   res.json({ success: true, managers: db.managers });
@@ -849,12 +842,13 @@ app.post("/api/block-customer", requireDeveloper, async (req, res) => {
   const cleanEmail = email.trim().toLowerCase();
   const db = await readDb();
 
-  const customerIndex = (db.registeredCustomers || []).findIndex(c => c.email.toLowerCase() === cleanEmail);
+  if (!db.registeredCustomers) db.registeredCustomers = [];
+  const customerIndex = db.registeredCustomers.findIndex(c => c.email.toLowerCase() === cleanEmail);
   if (customerIndex === -1) {
     return res.status(404).json({ error: "لم يتم العثور على هذا العميل في قائمة المسجلين." });
   }
 
-  const [customerToBlock] = db.registeredCustomers!.splice(customerIndex, 1);
+  const [customerToBlock] = db.registeredCustomers.splice(customerIndex, 1);
   if (blockReason) {
     customerToBlock.blockReason = blockReason;
   }
