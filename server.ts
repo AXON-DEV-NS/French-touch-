@@ -40,7 +40,9 @@ app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ limit: "20mb", extended: true }));
 
 // Persistent JSON Database path
-const DB_FILE = path.join(process.cwd(), "database.json");
+const DB_FILE = process.env.VERCEL || process.env.NODE_ENV === 'production' && !fs.existsSync(path.join(process.cwd(), "database.json"))
+  ? path.join("/tmp", "database.json")
+  : path.join(process.cwd(), "database.json");
 
 interface Visitor {
   email: string;
@@ -1685,7 +1687,8 @@ async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     // Load Vite in Middleware mode
     try {
-      const { createServer: createViteServer } = await import("vite");
+      const vitePkg = "vite";
+      const { createServer: createViteServer } = await import(/* @vite-ignore */ vitePkg);
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa"
