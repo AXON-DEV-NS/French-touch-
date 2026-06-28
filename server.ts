@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { kv } from "@vercel/kv";
 import { GoogleGenAI, Type } from "@google/genai";
-import { sendEmailOtp, sendPhoneOtp } from "./server/sendOtpService";
+import { sendEmailOtp } from "./server/sendOtpService";
 
 const app = express();
 const PORT = 3000;
@@ -181,9 +181,13 @@ async function readDb(): Promise<DbSchema> {
   };
   try {
     if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      const data = await kv.get<DbSchema>("frenchtouch_db");
-      if (data) {
-        return { ...initialDb, ...data };
+      try {
+        const data = await kv.get<DbSchema>("frenchtouch_db");
+        if (data) {
+          return { ...initialDb, ...data };
+        }
+      } catch (kvErr) {
+        console.error("KV Get Error:", kvErr);
       }
       return initialDb;
     }
@@ -195,6 +199,7 @@ async function readDb(): Promise<DbSchema> {
       try { fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2)); } catch (e) {}
       return initialDb;
     }
+
     const content = fs.readFileSync(DB_FILE, "utf-8");
     const parsed = JSON.parse(content);
     
@@ -210,12 +215,23 @@ async function writeDb(data: DbSchema) {
   try {
     memoryDb = data; // Always update in-memory cache
     if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-      await kv.set("frenchtouch_db", data);
+      try {
+        await kv.set("frenchtouch_db", data);
+      } catch (kvError) {
+        console.error("KV Set Error:", kvError);
+      }
       return;
     }
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+    
+    if (DB_FILE) {
+      try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+      } catch (fsError) {
+        console.error("FS Write Error:", fsError);
+      }
+    }
   } catch (error) {
-    console.error("Error writing database (using memory fallback on Vercel):", error);
+    console.error("Critical Error writing database:", error);
   }
 }
 // ----------------------------------------------------

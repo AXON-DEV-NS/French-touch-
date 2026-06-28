@@ -5,6 +5,13 @@
       "name": "uvyffi5",
       "addedAt": "2026-06-25T18:57:37.007Z",
       "password": "123"
+    },
+    {
+      "email": "test@test.com",
+      "name": "test",
+      "password": "123",
+      "lang": "ar",
+      "addedAt": "2026-06-28T12:10:27.729Z"
     }
   ],
   "visitors": [
@@ -18,7 +25,7 @@
       "role": "Customer"
     }
   ],
-  "pageViews": 4,
+  "pageViews": 6,
   "categories": [
     {
       "id": "sandwiches",
@@ -61,5 +68,10 @@
       "icon": "GlassWater"
     }
   ],
-  "subscribers": []
+  "subscribers": [],
+  "registeredCustomers": [],
+  "emailLogs": [],
+  "blockedCustomers": [],
+  "orderCounter": 0,
+  "reviews": []
 }
