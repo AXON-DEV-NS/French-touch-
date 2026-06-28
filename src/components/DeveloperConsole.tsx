@@ -4,7 +4,7 @@ import {
   Users, UserCheck, Trash2, PlusCircle, LayoutDashboard, 
   Sparkles, Globe, LogOut, Check, HelpCircle, Key, 
   Database, RefreshCw, Eye, Landmark, ArrowLeftRight, Mail, Send,
-  ShieldAlert, ShieldCheck
+  ShieldAlert, ShieldCheck, Power, Lock, Unlock, Wrench
 } from "lucide-react";
 import { Language, TRANSLATIONS, Manager } from "../types";
 import AICopilotConsole from "./AICopilotConsole";
@@ -52,6 +52,8 @@ interface DeveloperConsoleProps {
   previewRole: "Developer" | "Manager" | "Customer";
   setPreviewRole: (role: "Developer" | "Manager" | "Customer") => void;
   onDatabaseMutated?: (updatedData: any) => void;
+  maintenanceMode: boolean;
+  setMaintenanceMode: (val: boolean) => void;
 }
 
 export default function DeveloperConsole({
@@ -60,7 +62,9 @@ export default function DeveloperConsole({
   onLogout,
   previewRole,
   setPreviewRole,
-  onDatabaseMutated
+  onDatabaseMutated,
+  maintenanceMode,
+  setMaintenanceMode
 }: DeveloperConsoleProps) {
   const t = TRANSLATIONS[currentLang];
   const isRtl = currentLang === "ar";
@@ -86,6 +90,46 @@ export default function DeveloperConsole({
   const [pageViews, setPageViews] = useState(0);
   const [activeConsoleTab, setActiveConsoleTab] = useState<"logs" | "gmails" | "subscribers" | "customers" | "emaillogs" | "copilot">("copilot");
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const [togglingMaintenance, setTogglingMaintenance] = useState(false);
+
+  const handleToggleMaintenance = async () => {
+    setTogglingMaintenance(true);
+    setMessage(null);
+    try {
+      const nextVal = !maintenanceMode;
+      const res = await fetch("/api/maintenance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": currentUser.email,
+          "x-user-role": currentUser.role
+        },
+        body: JSON.stringify({ maintenanceMode: nextVal })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update maintenance state");
+      }
+
+      setMaintenanceMode(data.maintenanceMode);
+      setMessage({
+        text: currentLang === "ar"
+          ? `تم ${data.maintenanceMode ? "تفعيل وضع صيانة وتطوير الموقع بنجاح 🔒" : "إلغاء وضع الصيانة وفتح الموقع للجميع بنجاح 🔓"}`
+          : `Maintenance mode has been successfully ${data.maintenanceMode ? "activated 🔒" : "deactivated 🔓"}`,
+        type: "success"
+      });
+    } catch (err: any) {
+      console.error(err);
+      setMessage({
+        text: currentLang === "ar" ? "فشل تحديث حالة صيانة الموقع." : "Failed to update maintenance status.",
+        type: "error"
+      });
+    } finally {
+      setTogglingMaintenance(false);
+    }
+  };
 
   // Fetch visitors and managers from full-stack server
   const fetchData = async () => {
@@ -486,6 +530,58 @@ export default function DeveloperConsole({
               }`}
             >
               🍽️ {currentLang === "ar" ? "لوحة الزبون" : "Customer Restaurant"}
+            </button>
+          </div>
+        </div>
+
+        {/* MAINTENANCE MODE CONTROLLER */}
+        <div className="bg-stone-900 border border-stone-800 p-6 rounded-3xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-2xl border ${maintenanceMode ? "bg-red-500/10 border-red-500/30 text-red-400" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"}`}>
+                <Power className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-[#FDFBF7]">
+                    {currentLang === "ar" ? "التحكم في إتاحة الموقع (حالة الصيانة والتشغيل)" : "Site Operations & Maintenance Control"}
+                  </h3>
+                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${maintenanceMode ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}>
+                    {maintenanceMode ? (currentLang === "ar" ? "مغلق للصيانة" : "Closed for Maintenance") : (currentLang === "ar" ? "مفتوح للعامة" : "Open to Public")}
+                  </span>
+                </div>
+                <p className="text-xs text-stone-400 max-w-2xl leading-relaxed">
+                  {currentLang === "ar"
+                    ? "عند تفعيل وضع الصيانة، سيتم قفل تصفح الموقع بالكامل لجميع الزوار وسيتم عرض صفحة فاخرة تخبرهم بأن الموقع تحت التطوير. يمكنك كمطور أو مدير تسجيل الدخول الآمن حتى أثناء الصيانة لتعديل البيانات وتجربة الشاشات."
+                    : "When maintenance mode is active, the entire restaurant site will be locked for all public visitors, showing a premium under-development screen. Only developers and authorized managers can bypass this using secure credentials."}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleToggleMaintenance}
+              disabled={togglingMaintenance}
+              className={`w-full md:w-auto px-6 py-3.5 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+                maintenanceMode
+                  ? "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/30 shadow-lg shadow-emerald-600/10"
+                  : "bg-red-600 hover:bg-red-500 text-white border-red-500/30 shadow-lg shadow-red-600/10"
+              }`}
+            >
+              {togglingMaintenance ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : maintenanceMode ? (
+                <Unlock className="w-4 h-4" />
+              ) : (
+                <Lock className="w-4 h-4" />
+              )}
+              <span>
+                {togglingMaintenance
+                  ? (currentLang === "ar" ? "جاري التحديث..." : "Updating...")
+                  : maintenanceMode
+                  ? (currentLang === "ar" ? "فتح الموقع للعامة 🔓" : "Unlock Site 🔓")
+                  : (currentLang === "ar" ? "إغلاق الموقع للصيانة 🔒" : "Lock Site for Maintenance 🔒")}
+              </span>
             </button>
           </div>
         </div>

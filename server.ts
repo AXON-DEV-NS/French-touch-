@@ -154,6 +154,7 @@ interface DbSchema {
   exclusiveOffer?: ExclusiveOffer;
   weeklyOffers?: WeeklyOffer[];
   reviews?: RestaurantReview[];
+  maintenanceMode?: boolean;
 }
 
 const DEFAULT_CATEGORIES = [
@@ -1021,6 +1022,28 @@ app.post("/api/pageviews/increment", async (req, res) => {
   db.pageViews = (db.pageViews || 0) + 1;
   await writeDb(db);
   res.json({ count: db.pageViews });
+});
+
+// Maintenance Mode API
+app.get("/api/maintenance", async (req, res) => {
+  const db = await readDb();
+  res.json({ maintenanceMode: !!db.maintenanceMode });
+});
+
+app.post("/api/maintenance", requireDeveloper, async (req, res) => {
+  try {
+    const { maintenanceMode } = req.body;
+    if (typeof maintenanceMode !== "boolean") {
+      return res.status(400).json({ error: "maintenanceMode must be a boolean" });
+    }
+    const db = await readDb();
+    db.maintenanceMode = maintenanceMode;
+    await writeDb(db);
+    res.json({ success: true, maintenanceMode: db.maintenanceMode });
+  } catch (err: any) {
+    console.error("Set maintenance error:", err);
+    res.status(500).json({ error: "Server error: " + err.message });
+  }
 });
 
 app.post("/api/orders/next-number", async (req, res) => {

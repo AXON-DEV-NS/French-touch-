@@ -27,6 +27,7 @@ import RestaurantLogo from './components/RestaurantLogo';
 import LanguageLandingScreen from './components/LanguageLandingScreen';
 import GoogleLoginScreen from './components/GoogleLoginScreen';
 import DeveloperConsole from './components/DeveloperConsole';
+import MaintenanceScreen from './components/MaintenanceScreen';
 import ProductCustomizerModal from './components/ProductCustomizerModal';
 import ReviewsDiscussion from './components/ReviewsDiscussion';
 import AICopilotConsole from './components/AICopilotConsole';
@@ -93,6 +94,8 @@ export default function App() {
     const saved = safeSessionStorage.getItem('frenchtouch_entered');
     return saved === 'true';
   });
+
+  const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false);
 
   // --- Persistent State Loaded from LocalStorage ---
   const [currentLang, setCurrentLang] = useState<Language>(() => {
@@ -309,6 +312,18 @@ export default function App() {
         throw new Error('Not JSON');
       })
       .catch(err => console.warn('Failed to increment page views:', err));
+  }, []);
+
+  // Fetch maintenance mode state on mount
+  useEffect(() => {
+    fetch('/api/maintenance')
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.maintenanceMode === 'boolean') {
+          setMaintenanceMode(data.maintenanceMode);
+        }
+      })
+      .catch(err => console.warn('Failed to fetch maintenance state:', err));
   }, []);
 
   // Fetch dynamic categories
@@ -1082,6 +1097,19 @@ ${itemsList}
     );
   }
 
+  // Maintenance Mode Gate
+  if (maintenanceMode && currentUser?.role !== 'Developer' && currentUser?.role !== 'Manager') {
+    return (
+      <MaintenanceScreen
+        currentLang={currentLang}
+        onSelectLanguage={(lang) => setCurrentLang(lang)}
+        onLoginSuccess={(email, name, role, lang) => {
+          handleLoginSuccess({ email, name, role, lang });
+        }}
+      />
+    );
+  }
+
   if (!entered && currentUser?.role !== 'Manager') {
     return (
       <LanguageLandingScreen
@@ -1105,6 +1133,8 @@ ${itemsList}
         previewRole={previewRole}
         setPreviewRole={setPreviewRole}
         onDatabaseMutated={handleDatabaseMutated}
+        maintenanceMode={maintenanceMode}
+        setMaintenanceMode={setMaintenanceMode}
       />
     );
   }
